@@ -1,8 +1,0 @@
-{
-  "wwise_root_windows_environment_variable": "WWISEROOT",
-  "conversion_profile": "Vorbis Quality High",
-
-  "project_path": "sound2wem",
-  "project_name": "wavtowemscript",
-  "project_file": "wavtowemscript.wproj"
-}

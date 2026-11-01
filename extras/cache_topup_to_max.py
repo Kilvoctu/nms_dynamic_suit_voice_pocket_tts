@@ -2,22 +2,20 @@
 from time import time
 from modular.config import SuitVoiceConfig
 from modular.quick_cache import _replacement_wrapper
-import csv
 
 config = SuitVoiceConfig()
 
-# === Paste your ID list here ===
-wem_ids_raw = []
-with open(config.csv_path, newline='', encoding='utf-8') as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        if row.get("Used", "").strip().lower() == "yes":
-            wem_number = row.get("WEM_number")
-            if wem_number:
-                wem_ids_raw.append(str(wem_number))
+# Every line the game has actually used, from the JSON transcript map.
+wem_ids_raw = [
+    str(wem_id)
+    for wem_id, entry in config.intent_map.items()
+    if str(entry.get("Used", "")).strip().lower() == "yes"
+]
 
 
-def fill_cache_for_ids(wem_ids, max_count=None):
+def fill_cache_for_ids(wem_ids, max_count=None, progress=None):
+    """Fill each line's variant cache to max_count. progress(index, total,
+    wem_id, missing_count) is called once per line before its renders start."""
     if max_count is None:
         max_count = config.quick_cache_max
     wem_ids = [str(w) for w in wem_ids]
@@ -35,7 +33,12 @@ def fill_cache_for_ids(wem_ids, max_count=None):
 
         missing_count = max_count - existing_count
         if missing_count <= 0:
+            if progress is not None:
+                progress(idx, total_ids, wem_id, 0)
             continue
+
+        if progress is not None:
+            progress(idx, total_ids, wem_id, missing_count)
 
         for i in range(missing_count):
             t0 = time()

@@ -1,25 +1,25 @@
-# wem_utils.py (fixed)
+# wem_utils.py
 import subprocess
 from pathlib import Path
 import time
 
 
 def convert_to_wem(config, temp_wav_path, output_path: Path):
-    """
-    Convert WAV to WEM and save it directly to output_path.
-    Retries if the file is temporarily in use.
-    """
+    """Convert WAV to WEM via the standalone wav2wem encoder (retries if in use)."""
     temp_wav_path = Path(temp_wav_path).resolve()
     output_path = Path(output_path).resolve()  # Final WEM location
-    script_path = config.cmd_script_path.resolve()
+    wav2wem = config.wav2wem_path.resolve()    # standalone encoder binary
     temp_dir = config.temp_wem_dir.resolve()   # temporary folder for conversion
 
-    # Run Wwise conversion into temp_dir
+    # Encode into temp_dir first, then move into place with retries.
+    wem_file = temp_dir / temp_wav_path.with_suffix(".wem").name
+    wem_file.unlink(missing_ok=True)
+
     cmd = [
-        "cmd.exe", "/c",
-        str(script_path),
-        f'--out:{str(temp_dir)}',
-        str(temp_wav_path)
+        str(wav2wem),
+        str(temp_wav_path),
+        "-o", str(wem_file),
+        "-q", str(config.wav2wem_quality),
     ]
 
     try:
@@ -27,9 +27,6 @@ def convert_to_wem(config, temp_wav_path, output_path: Path):
     except subprocess.CalledProcessError as e:
         print(f"Subprocess failed during WEM conversion: {e}")
         raise
-
-    # The Wwise script will output temp_wav_name.wem in temp_dir
-    wem_file = temp_dir / temp_wav_path.with_suffix(".wem").name
 
     # Move/rename to final output_path with retries
     max_attempts = 10

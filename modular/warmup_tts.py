@@ -1,62 +1,76 @@
 # modular/warmup_tts.py
 import json
 import sys
+import time
 from pathlib import Path
-from TTS.api import TTS  # coqui-tts fork
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from modular import tts_utils
+
 
 def main():
-    print("Pipeline: Starting offline TTS compilation warmup...")
-    
-    # 1. Resolve project root absolute path structure
+    print("Pipeline: Starting Pocket TTS warmup (first run downloads model weights)...")
     project_root = Path(__file__).parent.parent.absolute()
     env_config_path = project_root / "config" / "environment_config.json"
-    
+
     if not env_config_path.exists():
         print(f"ERROR: Cannot warm up engine. Configuration profile missing: {env_config_path}")
         sys.exit(1)
-        
-    # 2. Extract configuration fields dynamically out of the JSON profile
+
+    with open(env_config_path, "r", encoding="utf-8") as f:
+        env_data = json.load(f)
+
+    pocket_model = env_data.get("models", {}).get("pocket_model", tts_utils.POCKET_DEFAULT_MODEL)
+
+    # Resolve the active voice: user customization overrides the defaults
+    voice = tts_utils.POCKET_DEFAULT_VOICE
+    for cfg_path in (
+        project_root / "config" / "default_customization.json",
+        project_root / "user" / "user_customization.json",
+        project_root / "config" / "user_customization.json",  # legacy location
+    ):
+        if cfg_path.exists():
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    voice = json.load(f).get("tts_voice", voice)
+            except Exception as e:
+                print(f"Warning: could not read {cfg_path.name}: {e}")
+
+    # Fire up the synthesis warmup routine (downloads weights into cache/hub if missing)
     try:
-        with open(env_config_path, "r", encoding="utf-8") as f:
-            env_data = json.load(f)
-    except Exception as e:
-        print(f"ERROR: environment_config.json format is corrupt: {e}")
-        sys.exit(1)
-        
-    # Fetch data values cleanly out of their respective nested JSON objects
-    models_cfg = env_data.get("models", {})
-    tts_model_name = models_cfg.get("tts_model") # "tts_models/en/ljspeech/tacotron2-DDC_ph"
-    
-    paths_cfg = env_data.get("paths", {})
-    temp_wem_setting = paths_cfg.get("temp_wem_dir") # "cache/tmp_wem_dir"
-    
-    if not tts_model_name or not temp_wem_setting:
-        print("ERROR: Crucial keys ('tts_model' or 'temp_wem_dir') missing inside environment_config.json")
-        sys.exit(1)
-        
-    # Ensure our workspace directory exists relative to the project root
-    temp_wem_dir = project_root / Path(temp_wem_setting.strip('"'))
-    temp_wem_dir.mkdir(parents=True, exist_ok=True)
-    
-    print(f"Pipeline: Verifying weights for voice signature -> {tts_model_name}")
-    
-    # 3. Fire up the synthesis warmup routine
-    try:
-        # This will download the models into the local cache if missing, or load them instantly
-        tts_model = TTS(model_name=tts_model_name)
-        
+        started = time.monotonic()
+        model = tts_utils.warm_all_pocket_voices(pocket_model, project_root)
+        print(f"[TTS] All voices warm (model '{pocket_model}') in {time.monotonic() - started:.1f}s")
+
         test_text = (
             "The required models and files for voice synthesis are now installed. "
             "If you are hearing this message, the models are downloaded and everything worked correctly."
         )
-        final_wav = temp_wem_dir / "warmup.wav"
-        tts_model.tts_to_file(text=test_text, file_path=str(final_wav))
-        
-        print(f"TTS warmup complete. Verification test file generated safely: {final_wav}")
-        
+        audio, sr = tts_utils.pocket_generate(pocket_model, project_root, test_text, voice)
+        wav_path = project_root / "cache" / "tmp_wav_dir" / "warmup.wav"
+        wav_path.parent.mkdir(parents=True, exist_ok=True)
+        tts_utils._write_wav(wav_path, audio, sr)
+        print(f"TTS warmup complete. Verification test file generated safely: {wav_path}")
+
+        # Best-effort end-to-end check through the wem encoder
+        wav2wem = project_root / "tools" / "wav2wem.exe"
+        if wav2wem.is_file():
+            import subprocess
+            wem_path = project_root / "cache" / "tmp_wem_dir" / "warmup.wem"
+            wem_path.parent.mkdir(parents=True, exist_ok=True)
+            result = subprocess.run(
+                [str(wav2wem), str(wav_path), "-o", str(wem_path)],
+                capture_output=True, creationflags=0x08000000 if sys.platform == "win32" else 0,
+            )
+            if result.returncode == 0 and wem_path.exists():
+                print(f"WEM conversion verified: {wem_path}")
+            else:
+                print("Warning: WEM conversion failed (pipeline will retry during play).")
+
     except Exception as e:
         print(f"ERROR: Local TTS compilation failed: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

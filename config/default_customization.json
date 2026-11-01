@@ -1,5 +1,5 @@
 {
-    "tts_model": "tts_models/en/ljspeech/tacotron2-DDC_ph",
+    "tts_voice": "fantine",
     "player_name": "Interloper",
     "phrase_settings": {
         "wordiness": "Standard",
@@ -12,6 +12,8 @@
         "ring_freq": 300,
         "ring_mix": 100,
         "pitch_semitones": 4,
-        "formant_percent": 80
+        "formant_percent": 80,
+        "loudness_target": -5.0,
+        "loudness_true_peak": 5.0
     }
 }

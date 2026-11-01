@@ -1,17 +1,14 @@
+import time
 from pathlib import Path
 from datetime import datetime
 from modular.llm_utils import reword_phrase
 from modular.prompt_utils import build_suit_prompt
 from modular.tts_utils import run_tts
-# from modular.wem_utils import convert_to_wem
-from sound2wem.dsv2wem_convert import convert_to_wem
+from modular.wem_utils import convert_to_wem
 
 
-def generate_replacement_voice_line(config, wem_id, output_path: Path):
-    """
-    Generate a new WEM for either cache or immediate use.
-    - output_path: directory where WEM should be saved (cache dir or mod_dir)
-    """
+def generate_replacement_voice_line(config, wem_id, output_path: Path, rephrase: bool = True):
+    """Generate one WEM variant; rephrase=False speaks the original transcription (background refresh path)."""
 
     if wem_id not in config.intent_map:
         print(f"[cache_replacement.py] No intent entry for WEM ID {wem_id}")
@@ -22,10 +19,20 @@ def generate_replacement_voice_line(config, wem_id, output_path: Path):
     category = intent_entry["Category"]
     intent = intent_entry["Intent"]
 
-    final_prompt = build_suit_prompt(config, category, intent, original_phrase, wem_id)
-    reworded = reword_phrase(config, wem_id, original_phrase, intent, final_prompt)
+    if rephrase:
+        final_prompt = build_suit_prompt(config, category, intent, original_phrase, wem_id)
+        stage_start = time.monotonic()
+        reworded = reword_phrase(config, wem_id, category, original_phrase, final_prompt)
+        llm_seconds = time.monotonic() - stage_start
+    else:
+        reworded = original_phrase
+        llm_seconds = 0.0
 
+    print(f'[Gen] {wem_id}: "{original_phrase}" -> "{reworded}" (llm {llm_seconds:.1f}s)')
+
+    stage_start = time.monotonic()
     temp_wav_path = run_tts(config, reworded, wem_id)
+    render_seconds = time.monotonic() - stage_start
 
     # Ensure output path exists
     output_path.mkdir(parents=True, exist_ok=True)
@@ -34,9 +41,14 @@ def generate_replacement_voice_line(config, wem_id, output_path: Path):
     if output_path == config.mod_dir:
         final_wem_path = output_path / f"{wem_id}.wem"
     else:
+        # Voice-tagged: lets quick_cache serve only variants generated with the
+        # currently selected voice and purge stale eras automatically.
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        final_wem_path = output_path / f"{wem_id}_{timestamp}.wem"
+        final_wem_path = output_path / f"{wem_id}_{config.tts_voice}_{timestamp}.wem"
 
     # Convert WAV to WEM
+    stage_start = time.monotonic()
     convert_to_wem(config, temp_wav_path, output_path=final_wem_path)
+    encode_seconds = time.monotonic() - stage_start
+    print(f"[Gen] {wem_id}: wem ready (render {render_seconds:.1f}s, encode {encode_seconds:.1f}s) -> {final_wem_path.name}")
     return final_wem_path

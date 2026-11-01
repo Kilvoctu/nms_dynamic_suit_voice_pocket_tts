@@ -1,151 +1,4 @@
 {
-    "666": {
-        "Filename": "666.WEM",
-        "Transcription": "Mandatory Test",
-        "Category": "_Debugging",
-        "Intent": "Hello, {name} has reached I.T.  Has {name} tried turning it off and then on again?",
-        "Used": "No"
-    },
-    "76438123": {
-        "Filename": "76438123.WEM",
-        "Transcription": "Extreme Cold: Critical",
-        "Category": "Severe Cold",
-        "Intent": "Extreme cold is critically impacting {name}'s protective capabilities, potentially depleting life support resources rapidly.",
-        "Used": "Yes"
-    },
-    "56102735": {
-        "Filename": "56102735.WEM",
-        "Transcription": "Danger: Critical Hypothermia",
-        "Category": "Severe Cold",
-        "Intent": "Extreme cold conditions have overwhelmed the life support system, and hypothermia has begun, failure to address this may be fatal.",
-        "Used": "Yes"
-    },
-    "968836370": {
-        "Filename": "968836370.WEM",
-        "Transcription": "Extreme Cold Damage Detected",
-        "Category": "Severe Cold",
-        "Intent": "Serious damage is being inflicted to {name} due to exposure to extreme cold.",
-        "Used": "Yes"
-    },
-    "223423849": {
-        "Filename": "223423849.WEM",
-        "Transcription": "Discovery Uploaded",
-        "Category": "Discovery",
-        "Intent": "{name}'s discovery has been uploaded to the galactic network.",
-        "Used": "Yes"
-    },
-    "263752892": {
-        "Filename": "263752892.WEM",
-        "Transcription": "Home Planet Claimed",
-        "Category": "Discovery",
-        "Intent": "{name} has officially claimed a planet as a new home base.",
-        "Used": "No"
-    },
-    "497090550": {
-        "Filename": "497090550.WEM",
-        "Transcription": "Discovery Uploaded",
-        "Category": "Discovery",
-        "Intent": "{name}'s discovery has been uploaded to the galactic network, and a reward for the discovery has been issued.",
-        "Used": "No"
-    },
-    "682556976": {
-        "Filename": "682556976.WEM",
-        "Transcription": "New Planet Analyzed",
-        "Category": "Discovery",
-        "Intent": "A new planet has been analyzed and the data recorded in {name}'s personal archives.",
-        "Used": "No"
-    },
-    "685057897": {
-        "Filename": "685057897.WEM",
-        "Transcription": "Discovery Uploaded",
-        "Category": "Discovery",
-        "Intent": "{name}'s discovery is uploaded and now pending peer review by the galactic scientific community.",
-        "Used": "Yes"
-    },
-    "760990899": {
-        "Filename": "760990899.WEM",
-        "Transcription": "Home Planet Established",
-        "Category": "Discovery",
-        "Intent": "A new planet has been successfully surveyed and established as {name}'s home.",
-        "Used": "No"
-    },
-    "990719346": {
-        "Filename": "990719346.WEM",
-        "Transcription": "New System Discovered",
-        "Category": "Discovery",
-        "Intent": "{name} has successfully discovered a previously uncharted star system.",
-        "Used": "No"
-    },
-    "1010781808": {
-        "Filename": "1010781808.WEM",
-        "Transcription": "Discovery Uploaded",
-        "Category": "Discovery",
-        "Intent": "A new discovery has been successfully uploaded by {name} to the official galactic survey network, allowing others across the galaxy to access and review the data.",
-        "Used": "Yes"
-    },
-    "27999850": {
-        "Filename": "27999850.WEM",
-        "Transcription": "Shield Protection Falling",
-        "Category": "Energy Shield",
-        "Intent": "{name}'s personal protective energy shield is failing due to continuous damage.",
-        "Used": "Yes"
-    },
-    "67834502": {
-        "Filename": "67834502.WEM",
-        "Transcription": "Shields Down",
-        "Category": "Energy Shield",
-        "Intent": "{name}'s personal protective energy shield has failed entirely.",
-        "Used": "Yes"
-    },
-    "272020218": {
-        "Filename": "272020218.WEM",
-        "Transcription": "Shield Down",
-        "Category": "Energy Shield",
-        "Intent": "{name}'s protective energy shield systems are offline due to complete energy depletion. Defensive capability is lost.",
-        "Used": "Yes"
-    },
-    "394683190": {
-        "Filename": "394683190.WEM",
-        "Transcription": "Shield Down",
-        "Category": "Energy Shield",
-        "Intent": "{name}'s personal protective energy shield has failed due to taking damage.",
-        "Used": "Yes"
-    },
-    "468585602": {
-        "Filename": "468585602.WEM",
-        "Transcription": "Shield Down",
-        "Category": "Energy Shield",
-        "Intent": "Energy levels of {name}'s personal protective energy shield are severely depleted. Immediate Recharge is required in order to restore full function.",
-        "Used": "Yes"
-    },
-    "691940593": {
-        "Filename": "691940593.WEM",
-        "Transcription": "Shield Protection Stabilizing",
-        "Category": "Energy Shield",
-        "Intent": "{name}'s energy shield is recovering from recent damage and field stabilization is underway.",
-        "Used": "Yes"
-    },
-    "781094525": {
-        "Filename": "781094525.WEM",
-        "Transcription": "Danger: Shield Compromised",
-        "Category": "Energy Shield",
-        "Intent": "{name}'s kinetic energy shield has failed and can no longer negate or reduce physical injury.",
-        "Used": "Yes"
-    },
-    "871932351": {
-        "Filename": "871932351.WEM",
-        "Transcription": "Shield Down",
-        "Category": "Energy Shield",
-        "Intent": "Inflicted damage has entirely destroyed {name}'s personal energy shield integrity.",
-        "Used": "Yes"
-    },
-    "623058381": {
-        "Filename": "623058381.WEM",
-        "Transcription": "Shield Down",
-        "Category": "Energy Shield",
-        "Intent": "{name}'s personal energy shield has ceased functioning due to lack of power.",
-        "Used": "Yes"
-    },
     "774834164": {
         "Filename": "774834164.WEM",
         "Transcription": "Weather Update - Storm Clearing",
@@ -158,20 +11,6 @@
         "Transcription": "Weather Update - Incoming Storm",
         "Category": "Local Hazards",
         "Intent": "A storm front will arrive at {name}'s location very soon.",
-        "Used": "Yes"
-    },
-    "351875919": {
-        "Filename": "351875919.WEM",
-        "Transcription": "Delve Limit Reached",
-        "Category": "Local Hazards",
-        "Intent": "{name}'s portable mining equipment has reached a physical limit imposed by gravitational forces. Deeper  excavation is impossible.",
-        "Used": "No"
-    },
-    "863051935": {
-        "Filename": "863051935.WEM",
-        "Transcription": "Extreme Hazard Planet",
-        "Category": "Local Hazards",
-        "Intent": "The planet currently being explored by {name} presents multiple types of extreme hazards.",
         "Used": "Yes"
     },
     "105331281": {
@@ -195,179 +34,11 @@
         "Intent": "Repairs have been completed on a damaged piece of {name}'s installed equipment.",
         "Used": "Yes"
     },
-    "117536789": {
-        "Filename": "117536789.WEM",
-        "Transcription": "Additional Resources Required",
-        "Category": "Equipment Status",
-        "Intent": "Additional resources are needed by {name} to build the desired item.",
-        "Used": "No"
-    },
-    "260557941": {
-        "Filename": "260557941.wem",
-        "Transcription": "Backup generators online",
-        "Category": "Equipment Status",
-        "Intent": "Backup generators have been engaged.",
-        "Used": "No"
-    },
-    "299876357": {
-        "Filename": "299876357.WEM",
-        "Transcription": "Freighter Acquired",
-        "Category": "Equipment Status",
-        "Intent": "{name} has acquired a new freighter.  It is in poor condition, requiring maintenance and repair.",
-        "Used": "No"
-    },
-    "315361790": {
-        "Filename": "315361790.WEM",
-        "Transcription": "Multi-Tool Charge Depleted",
-        "Category": "Equipment Status",
-        "Intent": "{name}'s Multi-tool power is completely depleted. Explain this, and provide a recommendation to monitor power levels more closely while using the equipment to avoid shutdown during operation.",
-        "Used": "Yes"
-    },
-    "337859118": {
-        "Filename": "337859118.WEM",
-        "Transcription": "Base Computer Online",
-        "Category": "Equipment Status",
-        "Intent": "The computer for the new base is online and operational. The full build menu is now accessible.",
-        "Used": "No"
-    },
-    "353234571": {
-        "Filename": "353234571.WEM",
-        "Transcription": "New Weapon Available",
-        "Category": "Equipment Status",
-        "Intent": "A new weapon has become available for {name}'s use, and may be retrieved when desired.",
-        "Used": "No"
-    },
-    "370738335": {
-        "Filename": "370738335.wem",
-        "Transcription": "Emergency damage recovery system engaged",
-        "Category": "Equipment Status",
-        "Intent": "Severe damage has been sustained by {name}'s equipment, and automated repair systems are now active.",
-        "Used": "No"
-    },
-    "425064686": {
-        "Filename": "425064686.WEM",
-        "Transcription": "Arial Propulsion Jet Pack Online",
-        "Category": "Equipment Status",
-        "Intent": "The jetpack has passed all status checks and is fully operational. Flight control systems have been linked to the Suit subsystems.",
-        "Used": "Yes"
-    },
-    "462791110": {
-        "Filename": "462791110.wem",
-        "Transcription": "Welcome home, Commander",
-        "Category": "Equipment Status",
-        "Intent": "{name} has arrived at a safe location.",
-        "Used": "No"
-    },
-    "474358890": {
-        "Filename": "474358890.WEM",
-        "Transcription": "New Freighter Acquired",
-        "Category": "Equipment Status",
-        "Intent": "a new freighter in poor condition has been acquired by {name}.",
-        "Used": "No"
-    },
-    "487034870": {
-        "Filename": "487034870.WEM",
-        "Transcription": "Internal View Selected",
-        "Category": "Equipment Status",
-        "Intent": "{name}'s first-person camera view of the suit or vehicle has been engaged.",
-        "Used": "No"
-    },
-    "496984207": {
-        "Filename": "496984207.WEM",
-        "Transcription": "Technology Offline",
-        "Category": "Equipment Status",
-        "Intent": "A component of {name}'s suit or equipment has been damaged and is now offline.",
-        "Used": "No"
-    },
-    "589305615": {
-        "Filename": "589305615.WEM",
-        "Transcription": "Shield Kinetic System Online",
-        "Category": "Equipment Status",
-        "Intent": "{name} Has gained full consciousness. The suit’s protective kinetic shield subsystem has been activated.",
-        "Used": "Yes"
-    },
-    "634281443": {
-        "Filename": "634281443.WEM",
-        "Transcription": "Commencing Atlas System Suit Initialization",
-        "Category": "Equipment Status",
-        "Intent": "It is time for {name} to wake up.  The Atlas Suit and AI companion are initializing and running self-diagnostic processes to prepare for user integration.",
-        "Used": "Yes"
-    },
-    "639001585": {
-        "Filename": "639001585.WEM",
-        "Transcription": "Suit Power Cells Depleted",
-        "Category": "Equipment Status",
-        "Intent": "{name}'s suit has exhausted its power reserves, rendering most functions inactive until recharged.",
-        "Used": "Yes"
-    },
     "757274367": {
         "Filename": "757274367.WEM",
         "Transcription": "Technology Installed",
         "Category": "Equipment Status",
         "Intent": "A new technology module has been successfully installed by {name}.",
-        "Used": "Yes"
-    },
-    "770752691": {
-        "Filename": "770752691.WEM",
-        "Transcription": "Scanner Damaged Repair Required",
-        "Category": "Equipment Status",
-        "Intent": "The scanner has been rendered inoperable; {name} must initiate repairs to restore functionality.",
-        "Used": "No"
-    },
-    "781458145": {
-        "Filename": "781458145.WEM",
-        "Transcription": "Equipment Damaged",
-        "Category": "Equipment Status",
-        "Intent": "{name}'s equipment has sustained significant damage, causing some systems or functions to be impaired or offline. Repairs or recalibration are required.",
-        "Used": "No"
-    },
-    "911633476": {
-        "Filename": "911633476.WEM",
-        "Transcription": "Initialization Sequence Complete",
-        "Category": "Equipment Status",
-        "Intent": "Startup routine completed; suit interface and systems are now online, and ready for {name} to engage in decision making tasks.",
-        "Used": "Yes"
-    },
-    "929033162": {
-        "Filename": "929033162.WEM",
-        "Transcription": "Device Critically Damaged",
-        "Category": "Equipment Status",
-        "Intent": "One or more critical components of {name}'s currently equipped tool are severely damaged, impairing its function. Repair or replacement is required to restore full operation.",
-        "Used": "No"
-    },
-    "934987809": {
-        "Filename": "934987809.WEM",
-        "Transcription": "No Active Technology in Multi Tool",
-        "Category": "Equipment Status",
-        "Intent": "{name}'s multitool has no active modules or usable systems. There is a total lack of function.",
-        "Used": "No"
-    },
-    "935180311": {
-        "Filename": "935180311.WEM",
-        "Transcription": "New Ship Now Available",
-        "Category": "Equipment Status",
-        "Intent": "A new starship is available for {name} to acquire.",
-        "Used": "No"
-    },
-    "1006934470": {
-        "Filename": "1006934470.WEM",
-        "Transcription": "Multi Tool And Mining Laser Attachment Operational",
-        "Category": "Equipment Status",
-        "Intent": "{name}'s multi-tool and mining laser attachment are fully operational and ready for use.",
-        "Used": "Yes"
-    },
-    "1037434146": {
-        "Filename": "1037434146.WEM",
-        "Transcription": "External View Selected",
-        "Category": "Equipment Status",
-        "Intent": "Switched to external camera view, offering a perspective outside of {name}'s suit or current vehicle.",
-        "Used": "No"
-    },
-    "1038991804": {
-        "Filename": "1038991804.WEM",
-        "Transcription": "New Technology Discovered",
-        "Category": "Equipment Status",
-        "Intent": "a new piece of technology has been obtained. Blueprint scans are added to {name}'s personal database and may be accessed at any time for review.",
         "Used": "Yes"
     },
     "976899439": {
@@ -377,53 +48,11 @@
         "Intent": "{name} has encountered extremely hazardous underground conditions during the night cycle, posing a threat to  life support and safety.",
         "Used": "Yes"
     },
-    "29330265": {
-        "Filename": "29330265.WEM",
-        "Transcription": "Extreme Water Conditions Detected",
-        "Category": "Extreme Conditions",
-        "Intent": "{name}'s exposure to extreme water conditions while immersed may lead to impaired functionality and bodily harm.",
-        "Used": "Yes"
-    },
-    "152151960": {
-        "Filename": "152151960.WEM",
-        "Transcription": "Extreme Conditions Detected",
-        "Category": "Extreme Conditions",
-        "Intent": "Local conditions are exceeding the suit's rated safety limits, escalating the risks to {name}'s health and equipment.",
-        "Used": "Yes"
-    },
-    "213575654": {
-        "Filename": "213575654.WEM",
-        "Transcription": "Extreme Subterranean Conditions Detected",
-        "Category": "Extreme Conditions",
-        "Intent": "{name} has encountered extremely hazardous underground conditions that exceed safe limits and may impact equipment or safety.",
-        "Used": "Yes"
-    },
-    "489352730": {
-        "Filename": "489352730.WEM",
-        "Transcription": "Extreme Water Conditions Detected",
-        "Category": "Extreme Conditions",
-        "Intent": "{name}'s exposure to extreme water conditions while immersed may lead to unpleasant consequences.",
-        "Used": "Yes"
-    },
     "570428671": {
         "Filename": "570428671.WEM",
         "Transcription": "Extreme Conditions Detected",
         "Category": "Extreme Conditions",
         "Intent": "Local conditions have escalated in intensity to extremely hazardous levels, posing risks to {name}'s health and equipment.",
-        "Used": "Yes"
-    },
-    "653680659": {
-        "Filename": "653680659.WEM",
-        "Transcription": "Extreme Subterranean Conditions Detected",
-        "Category": "Extreme Conditions",
-        "Intent": "There are hazardous subterranean conditions that could compromise {name}'s life expectancy.",
-        "Used": "Yes"
-    },
-    "733521599": {
-        "Filename": "733521599.WEM",
-        "Transcription": "Extreme Night Conditions Detected",
-        "Category": "Extreme Conditions",
-        "Intent": "Extreme night-time hazards have been detected, which may threaten {name}'s suit integrity and safety.",
         "Used": "Yes"
     },
     "711767177": {
@@ -433,74 +62,11 @@
         "Intent": "A civilian freighter’s shields are down. The hull is now directly exposed.",
         "Used": "Yes"
     },
-    "160765928": {
-        "Filename": "160765928.wem",
-        "Transcription": "Civilian freighter destroyed",
-        "Category": "Freighter Destroyed",
-        "Intent": "A civilian freighter has been destroyed by hostile pirate forces. No life signs remain. The destruction is confirmed.",
-        "Used": "Yes"
-    },
-    "954591441": {
-        "Filename": "954591441.wem",
-        "Transcription": "Pirate engines neutralized",
-        "Category": "Dreadnought Disabled",
-        "Intent": "The engines of a pirate Dreadnought have been disabled, leaving it unable to maneuver.",
-        "Used": "Yes"
-    },
-    "278919221": {
-        "Filename": "278919221.wem",
-        "Transcription": "Hyperdrive damage is critical",
-        "Category": "Dreadnought Departure",
-        "Intent": "A critically damaged pirate Dreadnought is trying to start their warp engines to make an uncontrolled emergency warp jump which will risk destruction of the ship.",
-        "Used": "Yes"
-    },
-    "311554138": {
-        "Filename": "311554138.WEM",
-        "Transcription": "Freighter Warp Initiated",
-        "Category": "Dreadnought Departure",
-        "Intent": "A pirate Dreadnought is preparing to leave the battle.",
-        "Used": "Yes"
-    },
-    "48466939": {
-        "Filename": "48466939.WEM",
-        "Transcription": "Freighter Warp Initiated",
-        "Category": "Dreadnought Departure",
-        "Intent": "A pirate Dreadnought is preparing to leave the battle.",
-        "Used": "Yes"
-    },
-    "565386800": {
-        "Filename": "565386800.WEM",
-        "Transcription": "Freighter Warp Initiated",
-        "Category": "Dreadnought Departure",
-        "Intent": "A pirate Dreadnought is preparing to leave the battle.",
-        "Used": "Yes"
-    },
-    "597203928": {
-        "Filename": "597203928.WEM",
-        "Transcription": "Freighter Warp Initiated",
-        "Category": "Dreadnought Departure",
-        "Intent": "A pirate Dreadnought is preparing to leave the battle.",
-        "Used": "Yes"
-    },
     "330331555": {
         "Filename": "330331555.WEM",
         "Transcription": "Income Received",
         "Category": "Increased Funds",
         "Intent": "Funds have been received.",
-        "Used": "Yes"
-    },
-    "543874217": {
-        "Filename": "543874217.WEM",
-        "Transcription": "Danger: Heat Levels Critical",
-        "Category": "Severe Heat",
-        "Intent": "Critical heat levels have bypassed {name}'s protective systems, resulting in life-threatening high temperatures.",
-        "Used": "Yes"
-    },
-    "580370729": {
-        "Filename": "580370729.WEM",
-        "Transcription": "Extreme Heat Damage Detected",
-        "Category": "Severe Heat",
-        "Intent": "Extreme heat damage has been detected; failure to mitigate this will cause {name} severe harm, possibly fatal.",
         "Used": "Yes"
     },
     "647699088": {
@@ -510,32 +76,11 @@
         "Intent": "unable to cope with critical heat conditions. Continued exposure will result in total destruction of the suit, and complete carbonizaton of it's biological contents.",
         "Used": "Yes"
     },
-    "303147008": {
-        "Filename": "303147008.WEM",
-        "Transcription": "Funds Depleted",
-        "Category": "Insufficient Funds",
-        "Intent": "no Funds available, current balance is zero.",
-        "Used": "Yes"
-    },
-    "911201958": {
-        "Filename": "911201958.WEM",
-        "Transcription": "Insufficient Funds",
-        "Category": "Insufficient Funds",
-        "Intent": "The amount of Funds on hand are insufficient for {name} to complete the requested purchase.",
-        "Used": "Yes"
-    },
     "980411923": {
         "Filename": "980411923.WEM",
         "Transcription": "Product Received",
         "Category": "Item Inventory",
         "Intent": "A product or item has been delivered and added to inventory.",
-        "Used": "Yes"
-    },
-    "780959188": {
-        "Filename": "780959188.WEM",
-        "Transcription": "Inventory Full",
-        "Category": "Item Inventory",
-        "Intent": "The inventory space is completely full, preventing additional item storage.",
         "Used": "Yes"
     },
     "383184645": {
@@ -552,67 +97,11 @@
         "Intent": "A single item intended for personal decoration has been added to inventory.",
         "Used": "Yes"
     },
-    "159011641": {
-        "Filename": "159011641.WEM",
-        "Transcription": "Transferred",
-        "Category": "Item Inventory",
-        "Intent": "An inventory item has been moved from slot or container to another slot or container.",
-        "Used": "No"
-    },
-    "200893742": {
-        "Filename": "200893742.WEM",
-        "Transcription": "No Free Slots In Ship Inventory",
-        "Category": "Item Inventory",
-        "Intent": "The ship's inventory is full. No additional items can be stored until space is cleared.",
-        "Used": "Yes"
-    },
-    "431813574": {
-        "Filename": "431813574.WEM",
-        "Transcription": "Inventory Contents Transferred",
-        "Category": "Item Inventory",
-        "Intent": "Selected inventory contents have been moved to a new storage location or compartment.",
-        "Used": "No"
-    },
-    "665195778": {
-        "Filename": "665195778.WEM",
-        "Transcription": "New Inventory Slots Available",
-        "Category": "Item Inventory",
-        "Intent": "Additional inventory slots have been installed in the suit, increasing carrying capacity.",
-        "Used": "No"
-    },
     "682086836": {
         "Filename": "682086836.WEM",
         "Transcription": "Item Received",
         "Category": "Item Inventory",
         "Intent": "{name} received an item, which is now added to inventory.",
-        "Used": "Yes"
-    },
-    "750398819": {
-        "Filename": "750398819.WEM",
-        "Transcription": "Product Transferred",
-        "Category": "Item Inventory",
-        "Intent": "An item has been moved from one inventory container to another.",
-        "Used": "No"
-    },
-    "769144390": {
-        "Filename": "769144390.WEM",
-        "Transcription": "Insufficient Resources",
-        "Category": "Item Inventory",
-        "Intent": "{name} attempted an action requiring resources not currently possessed in sufficient quantity.",
-        "Used": "Yes"
-    },
-    "925087453": {
-        "Filename": "925087453.WEM",
-        "Transcription": "Element Resources Successfully Transferred To Ship Inventory",
-        "Category": "Item Inventory",
-        "Intent": "Selected resources have been successfully transferred to ship cargo hold.",
-        "Used": "Yes"
-    },
-    "969545875": {
-        "Filename": "969545875.WEM",
-        "Transcription": "Element Resources Successfully Transferred",
-        "Category": "Item Inventory",
-        "Intent": "Selected inventory items have been successfully transferred to an alternate unspecified storage space.",
         "Used": "Yes"
     },
     "985789170": {
@@ -622,104 +111,6 @@
         "Intent": "The product has been correctly constructed.",
         "Used": "Yes"
     },
-    "28276028": {
-        "Filename": "28276028.WEM",
-        "Transcription": "Life Support Critical",
-        "Category": "Life Support",
-        "Intent": "Life support power has dropped to critical levels, risking imminent shutdown of suit systems, loss of equipment functions, and biological demise.",
-        "Used": "Yes"
-    },
-    "808789373": {
-        "Filename": "808789373.WEM",
-        "Transcription": "Life Support Systems Activated",
-        "Category": "Life Support",
-        "Intent": "Life support systems have activated and registered a bio-signature. Entity's preferred designation is logged as '{name}'.",
-        "Used": "Yes"
-    },
-    "825969836": {
-        "Filename": "825969836.WEM",
-        "Transcription": "Life Support Power Low",
-        "Category": "Life Support",
-        "Intent": "Life support power is significantly depleted. Failure to take corrective action will result in recalculation of expiration date of the suit's biological contents.",
-        "Used": "Yes"
-    },
-    "865668553": {
-        "Filename": "865668553.wem",
-        "Transcription": "Life support level falling",
-        "Category": "Life Support",
-        "Intent": "Life support power is dangerously low and must be restored to prevent {name}'s death.",
-        "Used": "Yes"
-    },
-    "1061736374": {
-        "Filename": "1061736374.WEM",
-        "Transcription": "Life Support Offline",
-        "Category": "Life Support",
-        "Intent": "Life support systems are now offline, and suit systems are beginning a shut down sequence. If this sequence completes, it will be very difficult for {name} to remain conscious.",
-        "Used": "Yes"
-    },
-    "449779025": {
-        "Filename": "449779025.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "389592073": {
-        "Filename": "389592073.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "241169623": {
-        "Filename": "241169623.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "672799524": {
-        "Filename": "672799524.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "167092968": {
-        "Filename": "167092968.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "4494640": {
-        "Filename": "4494640.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "45779246": {
-        "Filename": "45779246.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "695050944": {
-        "Filename": "695050944.WEM",
-        "Transcription": "Incoming Missiles Destroyed",
-        "Category": "Missile Destroyed",
-        "Intent": "All launched hostile missiles have been destroyed.",
-        "Used": "Yes"
-    },
-    "459254064": {
-        "Filename": "459254064.WEM",
-        "Transcription": "Enemy Missile Incoming",
-        "Category": "Missile Launch",
-        "Intent": "A hostile missile has been launched at a civilian freighter.",
-        "Used": "Yes"
-    },
     "245522736": {
         "Filename": "245522736.WEM",
         "Transcription": "Enemy Missile Incoming",
@@ -727,200 +118,11 @@
         "Intent": "A hostile missile has been launched at a civilian freighter.",
         "Used": "Yes"
     },
-    "80959229": {
-        "Filename": "80959229.WEM",
-        "Transcription": "Enemy Missile Incoming",
-        "Category": "Missile Launch",
-        "Intent": "A hostile missile has been launched at a civilian freighter.",
-        "Used": "Yes"
-    },
-    "776652442": {
-        "Filename": "776652442.WEM",
-        "Transcription": "Enemy Missile Incoming",
-        "Category": "Missile Launch",
-        "Intent": "A hostile missile has been launched at a civilian freighter.",
-        "Used": "Yes"
-    },
-    "972765308": {
-        "Filename": "972765308.WEM",
-        "Transcription": "Enemy Missile Incoming",
-        "Category": "Missile Launch",
-        "Intent": "A hostile missile has been launched at a civilian freighter.",
-        "Used": "Yes"
-    },
-    "756031301": {
-        "Filename": "756031301.WEM",
-        "Transcription": "Enemy Missile Incoming",
-        "Category": "Missile Launch",
-        "Intent": "A hostile missile has been launched at a civilian freighter.",
-        "Used": "Yes"
-    },
-    "126319994": {
-        "Filename": "126319994.WEM",
-        "Transcription": "Secure Transmission Module Located",
-        "Category": "Navigation",
-        "Intent": "A communications module has been found and its data is being downloaded to {name}'s navigation system.",
-        "Used": "Yes"
-    },
-    "243520476": {
-        "Filename": "243520476.WEM",
-        "Transcription": "Orbital Station Coordinates Received",
-        "Category": "Navigation",
-        "Intent": "New coordinates for a previously unvisited orbital station have been uploaded to {name}'s navigation system.",
-        "Used": "Yes"
-    },
-    "288672024": {
-        "Filename": "288672024.WEM",
-        "Transcription": "Distress Signal Detected",
-        "Category": "Navigation",
-        "Intent": "navigation computer has detected and traced a distress signal from another entity. Coordinates of the signal’s origin have been added to {name}'s navigation database for potential response.",
-        "Used": "Yes"
-    },
-    "334124591": {
-        "Filename": "334124591.WEM",
-        "Transcription": "Base Out Of Range",
-        "Category": "Navigation",
-        "Intent": "{name} is outside the legally claimed region boundaries of the current base. Outside the base there are a only a handful of small portable items availabe to be constructed and placed.",
-        "Used": "No"
-    },
-    "436192208": {
-        "Filename": "436192208.WEM",
-        "Transcription": "Starship Signal Detected",
-        "Category": "Navigation",
-        "Intent": "A signal has been detected that may be of interest, it appears to match a standard starship distress frequency. Navigation coordinates are marked for {name} to investigate.",
-        "Used": "Yes"
-    },
-    "545382948": {
-        "Filename": "545382948.WEM",
-        "Transcription": "Sigil Trait Module Located",
-        "Category": "Navigation",
-        "Intent": "A rare upgrade module relevant to Sigil Traits has been found, it awaits interaction.",
-        "Used": "No"
-    },
-    "705081998": {
-        "Filename": "705081998.wem",
-        "Transcription": "Anomoly detected",
-        "Category": "Navigation",
-        "Intent": "There is an unusual phenomenon detected nearby that {name}'s may find worth investigating.",
-        "Used": "No"
-    },
-    "906001973": {
-        "Filename": "906001973.WEM",
-        "Transcription": "Jumping",
-        "Category": "Navigation",
-        "Intent": "The hyperspace jump is currently underway. Unpleasant physical sensations such as dizziness or nausea as a result of visual or sensory distortions is absolutely normal, but it may be difficult to resist succombing to the effects.",
-        "Used": "No"
-    },
     "906332741": {
         "Filename": "906332741.WEM",
         "Transcription": "Alert: Navigational Data Received",
         "Category": "Navigation",
         "Intent": "New navigational data has been received and stored in navigation database.",
-        "Used": "Yes"
-    },
-    "965460983": {
-        "Filename": "965460983.WEM",
-        "Transcription": "Out Of Range: Return To Base",
-        "Category": "Navigation",
-        "Intent": "{name} is outside of the current base's functional area. Most construction opportunities are disabled outside the base boundary.",
-        "Used": "No"
-    },
-    "64910055": {
-        "Filename": "64910055.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "{name} is acting irrationally or unsustainably.",
-        "Used": "Yes"
-    },
-    "178898599": {
-        "Filename": "178898599.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "{name} may want to reconsider recent choices, negative consequences may follow if insistance on continuing with current actions.",
-        "Used": "Yes"
-    },
-    "205192151": {
-        "Filename": "205192151.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "{name}'s current choice of action is not recommended, and may be dangerous or inefficient.",
-        "Used": "Yes"
-    },
-    "225625917": {
-        "Filename": "225625917.WEM",
-        "Transcription": "Objective Complete",
-        "Category": "Notification",
-        "Intent": "{name}'s mission or assigned task has been successfully completed. A suggestion to partake of a self administered food reward would be appropriate.",
-        "Used": "Yes"
-    },
-    "284071635": {
-        "Filename": "284071635.WEM",
-        "Transcription": "New Assistant Acquired",
-        "Category": "Notification",
-        "Intent": "A new pilot has joined {name}'s fleet.",
-        "Used": "No"
-    },
-    "328948003": {
-        "Filename": "328948003.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "Continued poor decision making could lead to {name}'s harm or disadvantage.",
-        "Used": "Yes"
-    },
-    "582370014": {
-        "Filename": "582370014.WEM",
-        "Transcription": "Assistant Recruited",
-        "Category": "Notification",
-        "Intent": "A new recruit has joined {name}'s journey.",
-        "Used": "No"
-    },
-    "599588736": {
-        "Filename": "599588736.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "{name}'s actions may attract unwelcome attention from local authorities.",
-        "Used": "Yes"
-    },
-    "811360087": {
-        "Filename": "811360087.WEM",
-        "Transcription": "New Assistant Recruited",
-        "Category": "Notification",
-        "Intent": "A new intern has been recruited to assist {name}.",
-        "Used": "No"
-    },
-    "1003218333": {
-        "Filename": "1003218333.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "Reccommend {name}'s reviewal of immediate surroundings for possible threats.",
-        "Used": "Yes"
-    },
-    "1015651622": {
-        "Filename": "1015651622.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "{name}'s current behavior may hinder progress or cause problems.",
-        "Used": "Yes"
-    },
-    "228408571": {
-        "Filename": "228408571.WEM",
-        "Transcription": "Warning",
-        "Category": "Notification",
-        "Intent": "{name} should consider disengaging and retreating from the current situation for safety or strategic advantage.",
-        "Used": "Yes"
-    },
-    "512212065": {
-        "Filename": "512212065.WEM",
-        "Transcription": "Oxygen Levels Critical",
-        "Category": "Oxygen Level",
-        "Intent": "{name}'s oxygen supply is nearly depleted, with a corresponding immediate risk of suffocation.",
-        "Used": "Yes"
-    },
-    "768295468": {
-        "Filename": "768295468.WEM",
-        "Transcription": "Danger: Low Oxygen Levels",
-        "Category": "Oxygen Level",
-        "Intent": "{name}'s suit is nearly depleted of breathable oxygen.",
         "Used": "Yes"
     },
     "656990144": {
@@ -965,25 +167,11 @@
         "Intent": "There is a nearby danger or enemy presence that may threaten {name}'s safety.",
         "Used": "Yes"
     },
-    "72116738": {
-        "Filename": "72116738.wem",
-        "Transcription": "Sentinels Arrived",
-        "Category": "Personal Combat",
-        "Intent": "Sentinel enemy units have reached the current location and are preparing to attack {name}.",
-        "Used": "Yes"
-    },
     "78601477": {
         "Filename": "78601477.WEM",
         "Transcription": "Warning: Sentinel Walker Detected",
         "Category": "Personal Combat",
         "Intent": "A hostile large-scale heavily armed and armoured Sentinel unit has been detected approaching {name}'s location.  It's weapons are active and it is scanning.",
-        "Used": "Yes"
-    },
-    "90482995": {
-        "Filename": "90482995.WEM",
-        "Transcription": "Hostiles Approaching",
-        "Category": "Personal Combat",
-        "Intent": "Hostile forces are approaching {name} rapidly. Prepare for confrontation.",
         "Used": "Yes"
     },
     "486861530": {
@@ -993,26 +181,12 @@
         "Intent": "A high-level hostile Sentinel unit is approaching, seeking to engage {name} in combat.",
         "Used": "Yes"
     },
-    "540684729": {
-        "Filename": "540684729.wem",
-        "Transcription": "Sentinel force deactivated",
-        "Category": "Personal Combat",
-        "Intent": "Hostile Sentinel network in the area is temporarily disabled.",
-        "Used": "Yes"
-    },
     "673620140": {
         "Filename": "673620140.WEM",
         "Transcription": "Warning: Sentinels Engaged",
         "Category": "Personal Combat",
         "Intent": "{name} is actively in combat with hostile Sentinel units.",
         "Used": "Yes"
-    },
-    "306112359": {
-        "Filename": "306112359.WEM",
-        "Transcription": "Damage Sustained",
-        "Category": "Personal Protection",
-        "Intent": "{name}'s  has sustained moderate physical damage.",
-        "Used": "No"
     },
     "943635243": {
         "Filename": "943635243.WEM",
@@ -1028,32 +202,11 @@
         "Intent": "{name}'s Personal temperature shielding is failing, ability to protect against all temperature extremes is compromised.",
         "Used": "Yes"
     },
-    "899320928": {
-        "Filename": "899320928.WEM",
-        "Transcription": "Thermal Protection Offline",
-        "Category": "Personal Hazard Protection",
-        "Intent": "Thermal regulation systems have failed; further exposure to extreme temperatures will negatively affect {name}'s health.",
-        "Used": "Yes"
-    },
     "951631813": {
         "Filename": "951631813.WEM",
         "Transcription": "Temperature Levels Stabilizing",
         "Category": "Personal Hazard Protection",
         "Intent": "The suit's Temperature regulation systems are stabilizing; conditions are now within safe limits for {name}.",
-        "Used": "Yes"
-    },
-    "28697689": {
-        "Filename": "28697689.WEM",
-        "Transcription": "Radiation Damage Detected",
-        "Category": "Radiation Exposure",
-        "Intent": "Detected exposure to dangerous radiation levels that may severely impact {name}'s long term health.",
-        "Used": "Yes"
-    },
-    "124237937": {
-        "Filename": "124237937.WEM",
-        "Transcription": "Extreme Night Radiation Detected",
-        "Category": "Radiation Exposure",
-        "Intent": "Detection systems have registered extreme radiation levels during the local night cycle.",
         "Used": "Yes"
     },
     "696022064": {
@@ -1063,53 +216,11 @@
         "Intent": "Extremely high levels of radiation are detected nearby, requiring {name}'s immediate implementation of protective measures.",
         "Used": "Yes"
     },
-    "824368356": {
-        "Filename": "824368356.WEM",
-        "Transcription": "Extreme Subterranean Radiation Detected",
-        "Category": "Radiation Exposure",
-        "Intent": "Extremely high subterranean radiation levels have been detected, posing severe risk to {name}'s health and equipment.",
-        "Used": "Yes"
-    },
-    "899453751": {
-        "Filename": "899453751.WEM",
-        "Transcription": "Radiation Leak Detected",
-        "Category": "Radiation Exposure",
-        "Intent": "A nearby source of intense radiation is posing a threat to {name}.",
-        "Used": "Yes"
-    },
-    "53870591": {
-        "Filename": "53870591.WEM",
-        "Transcription": "Radiation Protection Offline",
-        "Category": "Radiation Exposure",
-        "Intent": "{name}'s suit's radiation shielding has completely failed, is now unable to mitigate the effects of radiation exposure.",
-        "Used": "Yes"
-    },
     "54980060": {
         "Filename": "54980060.WEM",
         "Transcription": "Radiation Protection Falling",
         "Category": "Radiation Exposure",
         "Intent": "The suit’s radiation shielding is degrading, {name}'s survival is increasingly vulnerable.",
-        "Used": "Yes"
-    },
-    "258814940": {
-        "Filename": "258814940.WEM",
-        "Transcription": "Radiation Levels Critical",
-        "Category": "Radiation Exposure",
-        "Intent": "Radiation exposure has reached a critical threshold, {name}'s continued exposure could prove fatal.",
-        "Used": "Yes"
-    },
-    "472945351": {
-        "Filename": "472945351.WEM",
-        "Transcription": "Radiation Protection Stabilizing",
-        "Category": "Radiation Exposure",
-        "Intent": "Radiation protection is returning to normal operational levels.",
-        "Used": "Yes"
-    },
-    "957514183": {
-        "Filename": "957514183.WEM",
-        "Transcription": "Danger: Radiation Breach",
-        "Category": "Radiation Exposure",
-        "Intent": "Radiation shielding has overloaded and failed, increasing risk of irreversible loss of {name}'s biological cohesion.",
         "Used": "Yes"
     },
     "330757140": {
@@ -1126,319 +237,11 @@
         "Intent": "Hostile starships are approaching, their weapons are armed and ready.",
         "Used": "Yes"
     },
-    "28199458": {
-        "Filename": "28199458.WEM",
-        "Transcription": "Hostile System: Weapons Engaged",
-        "Category": "Starship Combat",
-        "Intent": "Hostile forces have already initiated combat with local defenses in the system prior to arrival, and {name}'s starship has activated combat readiness protocols.",
-        "Used": "Yes"
-    },
-    "49616634": {
-        "Filename": "49616634.wem",
-        "Transcription": "Engaging Attack Ships",
-        "Category": "Starship Combat",
-        "Intent": "Attacking starships have been marked as valid weapon targets by {name}'s combat computer.",
-        "Used": "Yes"
-    },
-    "162710077": {
-        "Filename": "162710077.wem",
-        "Transcription": "Sentinel Starships Inbound",
-        "Category": "Starship Combat",
-        "Intent": "Hostile Sentinel starships are approaching to intercept {name}.",
-        "Used": "Yes"
-    },
-    "205039265": {
-        "Filename": "205039265.WEM",
-        "Transcription": "New Bounty Available",
-        "Category": "Starship Combat",
-        "Intent": "The Mercenary's Guild has detected a threat in this system. A reward is offered for capturing or destroying the rogue pilot.",
-        "Used": "No"
-    },
-    "310439562": {
-        "Filename": "310439562.WEM",
-        "Transcription": "Warning: Sentinel Interceptors Incoming",
-        "Category": "Starship Combat",
-        "Intent": "Sentinel starship reinforcements are inbound to engage {name}.",
-        "Used": "Yes"
-    },
-    "472197709": {
-        "Filename": "472197709.WEM",
-        "Transcription": "Target Acquired",
-        "Category": "Starship Combat",
-        "Intent": "A valid target is now being tracked by {name}'s combat computer.",
-        "Used": "Yes"
-    },
-    "494454783": {
-        "Filename": "494454783.WEM",
-        "Transcription": "Pirate Ship At Large: Bounty Available",
-        "Category": "Starship Combat",
-        "Intent": "A hostile starship is roaming this solar system, local authorites have offered a reward for it's capture or destruction.",
-        "Used": "No"
-    },
-    "510448383": {
-        "Filename": "510448383.WEM",
-        "Transcription": "Target Locked",
-        "Category": "Starship Combat",
-        "Intent": "Target lock established; {name}'s starship weapons accuracy will be noticeably improved for the active target.",
-        "Used": "Yes"
-    },
-    "514543818": {
-        "Filename": "514543818.WEM",
-        "Transcription": "Pirate Spotted: Bounty Available",
-        "Category": "Starship Combat",
-        "Intent": "Pirate activity has been detected.   there is a reward for capturing or destroying the rogue space pirate.",
-        "Used": "No"
-    },
-    "594696652": {
-        "Filename": "594696652.wem",
-        "Transcription": "Sentinel ships in combat range",
-        "Category": "Starship Combat",
-        "Intent": "Hostile Sentinel starships are close enough to engage {name} with weapons.",
-        "Used": "Yes"
-    },
-    "797446331": {
-        "Filename": "797446331.WEM",
-        "Transcription": "Hostile System: Engage Weapons",
-        "Category": "Starship Combat",
-        "Intent": "The star system is under hostile control, and weapons systems must be engaged immediately as the occupiers have detected {name} and are engaging in combat.",
-        "Used": "Yes"
-    },
-    "984473045": {
-        "Filename": "984473045.WEM",
-        "Transcription": "Warning: Hostile System",
-        "Category": "Starship Combat",
-        "Intent": "{name} entered a hostile-controlled star system where enemies will likely attack.",
-        "Used": "Yes"
-    },
-    "13628945": {
-        "Filename": "13628945.wem",
-        "Transcription": "Atmospheric interference",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s starship is unable to perform the attempted action while inside a planetary atmosphere.",
-        "Used": "No"
-    },
-    "137307545": {
-        "Filename": "137307545.wem",
-        "Transcription": "Station Proximity",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s starship is unable to perform the attempted action while too close to a space station.",
-        "Used": "No"
-    },
-    "197643865": {
-        "Filename": "197643865.WEM",
-        "Transcription": "Pulse Drive Engaged",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s ship has activated its pulse drive for rapid travel within the solar system.",
-        "Used": "No"
-    },
-    "294741566": {
-        "Filename": "294741566.wem",
-        "Transcription": "Local enemy disruption",
-        "Category": "Starship Movement",
-        "Intent": "Hostile forces are using a device that is restricting {name}'s speed.",
-        "Used": "No"
-    },
-    "375834098": {
-        "Filename": "375834098.wem",
-        "Transcription": "Landing sequence initiated",
-        "Category": "Starship Movement",
-        "Intent": "The autopilot landing procedure has started and {name}'s ship is descending for touchdown.",
-        "Used": "No"
-    },
-    "393574373": {
-        "Filename": "393574373.wem",
-        "Transcription": "Planetary interference",
-        "Category": "Starship Movement",
-        "Intent": "{name} is attempting a starship manouever that is intended for deep space, but the starship is currently inside a planetary atmosphere.",
-        "Used": "No"
-    },
-    "422143449": {
-        "Filename": "422143449.WEM",
-        "Transcription": "Landing Area Not Clear",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s starship autopilot has determined the chosen landing site to be unsafe or inaccessible, find a new landing location.",
-        "Used": "No"
-    },
-    "469963216": {
-        "Filename": "469963216.WEM",
-        "Transcription": "Initiating Landing Sequence",
-        "Category": "Starship Movement",
-        "Intent": "The guidance computer has assumed control to perform an automated landing sequence.",
-        "Used": "No"
-    },
-    "556538925": {
-        "Filename": "556538925.wem",
-        "Transcription": "Large ship proximity",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s starship is unable to perform the attempted action while in proximity to a large ship.",
-        "Used": "No"
-    },
-    "629992665": {
-        "Filename": "629992665.wem",
-        "Transcription": "Atmospheric interference",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s starship is unable to perform the attempted action while inside a planetary atmosphere.",
-        "Used": "No"
-    },
-    "769872372": {
-        "Filename": "769872372.wem",
-        "Transcription": "Large ship proximity",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s starship is unable to perform the attempted action while in proximity to a large ship.",
-        "Used": "No"
-    },
-    "824079454": {
-        "Filename": "824079454.wem",
-        "Transcription": "Space station proximity",
-        "Category": "Starship Movement",
-        "Intent": "{name}'s starship is unable to perform the attempted action while too close to a space station.",
-        "Used": "No"
-    },
-    "396681446": {
-        "Filename": "396681446.wem",
-        "Transcription": "Nearby toxins detected",
-        "Category": "Toxic Hazard",
-        "Intent": "Hazardous toxins are damaging {name}'s  suit filters.",
-        "Used": "Yes"
-    },
-    "50465612": {
-        "Filename": "50465612.WEM",
-        "Transcription": "Extreme Subterranean Toxicity Detected",
-        "Category": "Toxic Hazard",
-        "Intent": "Concentrated Toxic substances are detected underground, capable of breaching {name}'s toxic protections.",
-        "Used": "Yes"
-    },
-    "208814791": {
-        "Filename": "208814791.WEM",
-        "Transcription": "Extreme Water Toxicity Detected",
-        "Category": "Toxic Hazard",
-        "Intent": "Water toxicity levels have reached extreme danger thresholds while {name} is immersed.",
-        "Used": "Yes"
-    },
-    "490165063": {
-        "Filename": "490165063.WEM",
-        "Transcription": "Extreme Night Toxicity Detected",
-        "Category": "Toxic Hazard",
-        "Intent": "Extremely toxic conditions have been detected during the night cycle, posing significant danger if {name} is exposed.",
-        "Used": "Yes"
-    },
-    "675954230": {
-        "Filename": "675954230.WEM",
-        "Transcription": "Extreme Toxicity Detected",
-        "Category": "Toxic Hazard",
-        "Intent": "a region of extreme hazardous toxicity, requiring immediate action to avoid {name}'s damage or poisoning.",
-        "Used": "Yes"
-    },
-    "151182894": {
-        "Filename": "151182894.WEM",
-        "Transcription": "Toxic Protection Offline",
-        "Category": "Toxic Hazard",
-        "Intent": "The suit can no longer protect {name}'s from toxins and severe prolonged damage is expected.",
-        "Used": "Yes"
-    },
-    "335483997": {
-        "Filename": "335483997.WEM",
-        "Transcription": "Toxic Protection Stabilizing",
-        "Category": "Toxic Hazard",
-        "Intent": "Decontamination protocols activating; {name}'s toxic shielding is regaining function.",
-        "Used": "Yes"
-    },
-    "498474774": {
-        "Filename": "498474774.WEM",
-        "Transcription": "Toxicity Levels Critical",
-        "Category": "Toxic Hazard",
-        "Intent": "Toxic contamination has reached levels that will quickly be fatal; immediate safety action required.",
-        "Used": "Yes"
-    },
     "797567920": {
         "Filename": "797567920.WEM",
         "Transcription": "Toxic Protection Falling",
         "Category": "Toxic Hazard",
         "Intent": "Toxic shielding is weakening; omminent direct exposure to ambient poisons.",
         "Used": "Yes"
-    },
-    "973658086": {
-        "Filename": "973658086.WEM",
-        "Transcription": "Danger: Toxic Rain Breach",
-        "Category": "Toxic Hazard",
-        "Intent": "Life-threatening toxic substances have breached the suit’s protective barriers, posing immediate danger to {name}'s health.",
-        "Used": "Yes"
-    },
-    "1063828486": {
-        "Filename": "1063828486.WEM",
-        "Transcription": "Toxic Damage Detected",
-        "Category": "Toxic Hazard",
-        "Intent": "Toxins detected, direct exposure may cause {name} to experience severe physical side effects.",
-        "Used": "Yes"
-    },
-    "548071497": {
-        "Filename": "548071497.WEM",
-        "Transcription": "Vehicle Deployed",
-        "Category": "Vehicle Readiness",
-        "Intent": "{name}'s selected vehicle has been successfully deployed to the current location.",
-        "Used": "Yes"
-    },
-    "670654758": {
-        "Filename": "670654758.WEM",
-        "Transcription": "Vehicle Acquired",
-        "Category": "Vehicle Readiness",
-        "Intent": "A new vehicle or starship has been added to {name}'s collection.",
-        "Used": "No"
-    },
-    "682649339": {
-        "Filename": "682649339.WEM",
-        "Transcription": "New Vehicle Acquired",
-        "Category": "Vehicle Readiness",
-        "Intent": "A new vehicle has been added to {name}'s accessible assets.",
-        "Used": "Yes"
-    },
-    "729203380": {
-        "Filename": "729203380.WEM",
-        "Transcription": "Vehicle Mobilized",
-        "Category": "Vehicle Readiness",
-        "Intent": "A vehicle is ready for use at {name}'s location.",
-        "Used": "Yes"
-    },
-    "1045889204": {
-        "Filename": "1045889204.WEM",
-        "Transcription": "Vehicle Summoned",
-        "Category": "Vehicle Readiness",
-        "Intent": "A vehicle has been summoned and delivered via orbital drop.",
-        "Used": "Yes"
-    },
-    "531979220": {
-        "Filename": "531979220.WEM",
-        "Transcription": "Fuel Required",
-        "Category": "Vehicle Status",
-        "Intent": "Vehicle fuel levels are below operational thresholds and {name} must replenish reserves to continue normal function.",
-        "Used": "Yes"
-    },
-    "579975330": {
-        "Filename": "579975330.WEM",
-        "Transcription": "Vehicle Damage Sustained",
-        "Category": "Vehicle Status",
-        "Intent": "{name}'s vehicle has taken medium damage.  Do not speculate on the source of damage.",
-        "Used": "Yes"
-    },
-    "740830728": {
-        "Filename": "740830728.WEM",
-        "Transcription": "Refuel Vehicle",
-        "Category": "Vehicle Status",
-        "Intent": "{name}'s vehicle is critically low on fuel and requires immediate refueling or recharging.",
-        "Used": "Yes"
-    },
-    "891464212": {
-        "Filename": "891464212.WEM",
-        "Transcription": "Fuel Depleted",
-        "Category": "Vehicle Status",
-        "Intent": "vehicle fuel reserves are fully depleted, disabling {name}'s vehicle operation.",
-        "Used": "No"
-    },
-    "974964870": {
-        "Filename": "974964870.WEM",
-        "Transcription": "Damage Sustained To Vehicle",
-        "Category": "Vehicle Status",
-        "Intent": "{name}'s vehicle has sustained light to moderate damage and the safety harness has engaged as a protective response.",
-        "Used": "No"
     }
 }

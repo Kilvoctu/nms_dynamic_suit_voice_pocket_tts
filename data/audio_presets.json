@@ -1,6 +1,6 @@
 {
     "Factory Standard Exosuit Core": {
-        "target_model": "tts_models/en/ljspeech/tacotron2-DDC_ph",
+        "tts_voice": "fantine",
         "description": "Loaded Factory Standard Exosuit parameters.",
         "gain_db": 5,
         "tempo": 1.02,
@@ -11,40 +11,40 @@
         "formant_percent": 80
     },
     "Gek NipNip Merchant": {
-        "target_model": "tts_models/en/ljspeech/tacotron2-DDC_ph",
+        "tts_voice": "jean",
         "description": "Warning, you are too high to land.",
         "gain_db": 5,
-        "tempo": 0.69,
-        "pitch_semitones": 5,
+        "tempo": 0.82,
+        "pitch_semitones": 6,
         "ring_mix": 25,
         "rate": 1.26,
         "ring_freq": 830,
         "formant_percent": 50
     },
     "Vy'Keen Juggernaut": {
-        "target_model": "tts_models/en/ljspeech/tacotron2-DDC_ph",
+        "tts_voice": "marius",
         "description": "Extreme vocal cord mutation, subvocal layers active.",
         "gain_db": 5,
-        "tempo": 2.00,
-        "pitch_semitones": -12,
+        "tempo": 1.15,
+        "pitch_semitones": -4,
         "ring_mix": 100,
         "rate": 0.50,
         "ring_freq": 300,
-        "formant_percent": 80
+        "formant_percent": 95
     },
     "Caffeinated Korvax": {
-        "target_model": "tts_models/en/ljspeech/tacotron2-DDC_ph",
+        "tts_voice": "cosette",
         "description": "Quantum frequency distortion enabled.",
         "gain_db": 5,
-        "tempo": 1.35,
-        "pitch_semitones": 9,
+        "tempo": 1.05,
+        "pitch_semitones": 5,
         "ring_mix": 95,
         "rate": 1.20,
         "ring_freq": 850,
         "formant_percent": 45
     },
     "Queeg 500 Tactical Advisor": {
-        "target_model": "tts_models/en/ljspeech/tacotron2-DDC_ph",
+        "tts_voice": "javert",
         "description": "Loaded Queeg 500 configuration. Red Alert state protocols operational.",
         "gain_db": 4,
         "tempo": 1.84,
@@ -55,7 +55,7 @@
         "formant_percent": 150
     },
     "Lucia Kline, Exolinguist": {
-        "target_model": "tts_models/en/ljspeech/tacotron2-DDC_ph",
+        "tts_voice": "azelma",
         "description": "What did you just call me?  You do know I can understand you, right?",
         "gain_db": 5,
         "tempo": 1.20,

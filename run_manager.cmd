@@ -1,36 +1,49 @@
 @echo off
-title Exosuit Companion AI Dashboard
+title NMS DSV Management Utility
 echo ====================================================
 echo   Initializing Exosuit Vocal Diagnostic Interface...
 echo ====================================================
+
+set "ROOT=%~dp0"
+
+REM Bootstrap: prefer the venv interpreter; create it (and install the UI
+REM dependencies) on first run so the utility is always double-clickable.
+REM Once the environment is healthy, the console dismisses itself and the
+REM manager runs console-free via pythonw.
+set "PYEXE=%ROOT%venv\Scripts\python.exe"
+set "PYWEXE=%ROOT%venv\Scripts\pythonw.exe"
+if not exist "%PYEXE%" goto bootstrap
+
+REM The venv existing is not enough - verify the UI stack is actually present
+REM (a partially cleaned venv must self-heal instead of crashing at boot).
+REM Filesystem check only: spawning an interpreter here adds seconds of popup.
+if not exist "%ROOT%venv\Lib\site-packages\PySide6\__init__.py" goto bootstrap
+
+REM Healthy environment: hand off to the windowless interpreter and close.
+start "" "%PYWEXE%" "%ROOT%manager\main.py"
+exit /b 0
+
+:bootstrap
+echo [First run] Creating the virtual environment and installing dependencies...
+echo [First run] This can take a few minutes. Please wait.
+if not exist "%PYEXE%" python -m venv "%ROOT%venv" || goto error
+"%PYEXE%" -m pip install --upgrade pip --quiet
+"%PYEXE%" -m pip install --prefer-binary -r "%ROOT%requirements.txt" || goto error
+
+REM Bootstrap finished: verify, then hand off to the GUI without a console.
+"%PYEXE%" -c "import PySide6" >nul 2>&1
+if errorlevel 1 goto error
+start "" "%PYWEXE%" "%ROOT%manager\main.py"
+exit /b 0
+
+:error
 echo.
+echo [ERROR]: Bootstrap failed. Check your internet connection and Python install.
+pause
+exit /b 1
 
-set VENV_PYTHON="%~dp0venv\Scripts\python.exe"
-set MANAGER_SCRIPT="%~dp0manager\dsv_manager.py"
-
-REM 1. Verify that the virtual environment actually exists
-if not exist %VENV_PYTHON% (
-    echo [ERROR]: Virtual Environment matrix missing!
-    echo Please execute 'setup.cmd' first to initialize the environment modules.
-    echo.
-    pause
-    exit /b 1
-)
-
-REM 2. Verify that the primary manager file script is present
-if not exist %MANAGER_SCRIPT% (
-    echo [ERROR]: Core control script not found at manager/dsv_manager.py!
-    echo Please verify your file installation extraction boundaries.
-    echo.
-    pause
-    exit /b 1
-)
-
-REM 3. Launch the dashboard cleanly using the sandboxed interpreter environment
-%VENV_PYTHON% %MANAGER_SCRIPT%
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo [Warning]: Dashboard pipeline closed with an unexpected exit code.
-    pause
-)
+:error
+echo.
+echo [ERROR]: Bootstrap failed. Check your internet connection and Python install.
+pause
+exit /b 1

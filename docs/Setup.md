@@ -32,7 +32,7 @@ Voice: **Voice Model** tab (8 built-ins plus clones, see below). Sound: **Audio 
 
 Tone and verbiage presets live on the **User Profile** tab; built-ins can't be changed. **Manage** opens the preset editor where you can duplicate a built-in or create your own. Your presets are saved in `user/prompt_presets.json`.
 
-**Base Prompt** is the suit's core instruction block: duplicate it, edit the copy, **Activate** to apply. It shapes every line the suit speaks. Change with care.
+**Base Prompt** is the suit's core instruction block: duplicate it, edit the copy, **Activate** to apply. It shapes every line the suit speaks. Change with care. **Distill Chat Persona...** rewrites a long chat persona (JSON or TXT) into a compact TTS base with the local model.
 
 **Combination Test** runs any tone + verbiage pairing against a real in-game phrase: pick category and phrase, check the exact prompt, **Generate Test Phrase** to generate with the local model (loads on first use).
 

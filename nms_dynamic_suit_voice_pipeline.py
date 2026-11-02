@@ -45,23 +45,24 @@ def watch_wems(wtray_ui, config):
     _refresh_lock = threading.Lock()
     _refresh_generation = [0]
 
-    def _refresh_mod_folder():
-        """Bump the generation and (re)start the sweep worker."""
+    def _refresh_mod_folder(rephrase=False):
+        """Bump the generation and (re)start the sweep worker; rephrase=True for
+        style changes (tone/wordiness/base), False for cheap voice-era swaps."""
         superseded = _refresh_lock.locked()
         _refresh_generation[0] += 1
         if superseded:
             print("[VoiceFiles] Restarting the refresh sweep with the new settings...")
-        threading.Thread(target=_refresh_worker, daemon=True, name="mod-folder-refresh").start()
+        threading.Thread(target=_refresh_worker, args=(rephrase,), daemon=True, name="mod-folder-refresh").start()
 
-    def _refresh_worker():
+    def _refresh_worker(rephrase=False):
         gen = _refresh_generation[0]
         with _refresh_lock:
             if gen != _refresh_generation[0]:
                 return  # superseded while waiting for the previous sweep
             try:
-                from modular.quick_cache import _effects_fingerprint, load_mod_manifest
+                from modular.quick_cache import _settings_fingerprint, load_mod_manifest
 
-                fingerprint = _effects_fingerprint(config)
+                fingerprint = _settings_fingerprint(config)
                 manifest = load_mod_manifest(config)
                 target_dir = config.mod_dir
                 if not target_dir or not target_dir.exists():
@@ -82,12 +83,13 @@ def watch_wems(wtray_ui, config):
                 used = [i for i in stale if i in config.intent_map and str(config.intent_map[i].get("Used", "")).strip().lower() == "yes"]
                 ordered = used + [i for i in stale if i not in used]
                 total = len(ordered)
-                print(f"[VoiceFiles] Refreshing {total} of {len(all_ids)} tracked voice files to '{config.tts_voice}' (gameplay lines render first)...")
+                mode = "restyled voice files" if rephrase else "voice files"
+                print(f"[VoiceFiles] Refreshing {total} of {len(all_ids)} tracked {mode} to '{config.tts_voice}' (gameplay lines render first)...")
                 for index, wem_id in enumerate(ordered, 1):
                     if not wtray_ui.running or gen != _refresh_generation[0]:
                         return  # engine stopping or a newer settings change took over
                     wtray_ui.icon.title = f"Dynamic Suit Voice - Refreshing voice files {index}/{total}..."
-                    cached_file = get_cached_wem(config, wem_id, top_up=False, rephrase=False, priority=10)
+                    cached_file = get_cached_wem(config, wem_id, top_up=False, rephrase=rephrase, priority=10)
                     if cached_file is None:
                         continue
                     moved = move_cachedfile_to_mod_dir(config, cached_file, target_dir, wem_id)
@@ -124,7 +126,13 @@ def watch_wems(wtray_ui, config):
             else:
                 if changed:
                     print(f"[Config] Applied live changes: {', '.join(changed)}")
-                    threading.Thread(target=_refresh_mod_folder, daemon=True, name="mod-folder-refresh").start()
+                    # Style changes (tone/wordiness/base/player name) restyle the
+                    # lines; a bare voice/effects swap just re-speaks the canned
+                    # transcriptions.
+                    style_changed = any(
+                        c in ("tone", "wordiness", "base prompt", "prompt presets", "player name")
+                        for c in changed)
+                    threading.Thread(target=_refresh_mod_folder, args=(style_changed,), daemon=True, name="mod-folder-refresh").start()
         if config.mod_dir != current_mod_dir:
             current_mod_dir = config.mod_dir
             print(f"[Config] Watch folder is now: {current_mod_dir}")

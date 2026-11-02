@@ -188,7 +188,8 @@ class SuitVoiceConfig:
             n_ctx=40960,
             n_batch=1024,
             n_threads=min(os.cpu_count() or 4, 8),  # guard the hardware footprint
-            verbose=False
+            verbose=False,
+            flash_attn=True,  # supported by Gemma's architecture; removes V-cache padding
         )
         return self.llm
 

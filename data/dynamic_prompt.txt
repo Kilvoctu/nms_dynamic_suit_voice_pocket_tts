@@ -8,7 +8,7 @@ Details for context:
 YOU ARE SPEAKING DIRECTLY TO {name} - DO NOT EVER INSULT THEM BY REFERRING TO THEM IN THIRD PERSON.
 MANDATORY INSTRUCTION: {category_context}
 
-Each sentence in your output must be unique and never include phrasing that matches or re-uses anything any phrases or
-distict elements out of the following list:
+Each sentence in your output must be unique and never include phrasing that matches or re-uses any phrases or
+distinct elements out of the following list:
 {recent_lines}
 

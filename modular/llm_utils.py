@@ -88,7 +88,9 @@ def add_final_output_line(config, wem_id, line):
     sublines = [s.strip() for s in re.split(split_pattern, line) if s.strip()]
 
     lines = config.recent_lines_text[wem_id]
-    lines.extend(sublines)
+    for subline in sublines:
+        if subline not in lines:
+            lines.append(subline)
 
     # Trim oldest if over max
     while len(lines) > config.max_session_lines:

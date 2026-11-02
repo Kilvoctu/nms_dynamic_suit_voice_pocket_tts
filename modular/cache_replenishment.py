@@ -41,10 +41,12 @@ def generate_replacement_voice_line(config, wem_id, output_path: Path, rephrase:
     if output_path == config.mod_dir:
         final_wem_path = output_path / f"{wem_id}.wem"
     else:
-        # Voice-tagged: lets quick_cache serve only variants generated with the
-        # currently selected voice and purge stale eras automatically.
+        # Voice+settings-tagged: lets quick_cache serve only variants from the
+        # current voice/phrasing era and purge stale ones automatically.
+        from modular.quick_cache import _settings_fingerprint, _voice_tag
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        final_wem_path = output_path / f"{wem_id}_{config.tts_voice}_{timestamp}.wem"
+        tag = f"{_voice_tag(config.tts_voice)}_{_settings_fingerprint(config)}"
+        final_wem_path = output_path / f"{wem_id}_{tag}_{timestamp}.wem"
 
     # Convert WAV to WEM
     stage_start = time.monotonic()

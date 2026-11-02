@@ -310,8 +310,10 @@ class VoiceModelTab(QWidget):
 
     # --------------------------------------------------------------- cloning
     def _choose_clone_sample(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Choose a Voice Sample", "", "WAV Audio (*.wav)")
+        start = self.window.last_browse_dir("clone_sample")
+        path, _ = QFileDialog.getOpenFileName(self, "Choose a Voice Sample", start, "WAV Audio (*.wav)")
         if path:
+            self.window.remember_browse_dir("clone_sample", path)
             self._clone_sample_path = Path(path)
             self.clone_sample_label.setText(self._clone_sample_path.name)
             self._update_clone_button()

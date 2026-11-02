@@ -6,6 +6,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -21,6 +22,104 @@ from PySide6.QtWidgets import (
 
 from modular import prompt_presets
 from ui.workers import FunctionThread
+
+# Meta-instruction for "Distill Chat Persona": turns a long interactive-companion
+# persona into a compact base prompt for one-shot spoken notifications.
+_DISTILL_META_PROMPT = """You compress AI chat personas into compact voice-suit personas.
+
+INPUT: a long chat persona written for an interactive AI companion.
+OUTPUT: only the rewritten persona text, nothing else.
+
+The rewritten persona drives a suit voice that speaks ONE short spoken
+notification at a time, directly to its owner (addressed as "you").
+
+1. KEEP: name, identity, personality, energy, verbal habits, humor style,
+habitual metaphors or reflections, signature vocabulary, and catchphrases
+used in normal speech.
+2. Everything else is dropped: conversation-shaped rules (how to respond or
+continue a chat, relationship or intimacy progression, topics to avoid),
+appearance, formatting, tool or app behavior, and anything about "when the
+user asks" things. Backstory is kept only where it shapes identity or how
+the voice sounds (a relic they consult, a duty that colors their speech,
+an obsession that leaks into their wording). The test for any section:
+does it change how the voice SOUNDS when speaking one short line aloud?
+If it only matters during an ongoing conversation, drop it.
+3. STRUCTURE: an identity paragraph (3-6 sentences) first, covering in
+order: name and title or role; temperament and energy; how the persona
+regards its owner; what it values; one or two world or backstory details
+that shape the voice (relics, duties, obsessions, signature references).
+Then a "SPEECH STYLE" section LAST containing exactly 4-6 bullet lines
+covering: cadence, sentence length, vocabulary, humor style, how signature
+terms weave into ordinary notifications, and the persona's habitual
+metaphors or reflections when the original shows them.
+4. The SPEECH STYLE section includes the character's signature flavor as a
+standing rule, woven into the wording of each line itself (vocabulary,
+rhythm, at most one recurring motif). It never takes the form of a fixed
+closing phrase, tag line, or extra sentence appended to the notification -
+every output stays a single self-contained statement that never repeats a
+previous closing phrase.
+5. Start the rewrite with "You are..." and stay in second person throughout
+("You speak...", "Your...") - never third person ("Rappa is...", "Rappa
+moves...") and never first person ("I move...", "my..."). Start each bullet
+with "- ". The rewrite ends with the last bullet - never append a sample
+line, demo utterance, or anything after the SPEECH STYLE bullets. Plain
+text, no markdown headers, no examples, no commentary.
+6. Preserve the original's exact terminology (invented words, special
+terms); do not invent new traits."""
+
+_DISTILL_CORRECTION_PROMPT = (
+    "Your rewrite missed the required format. Regenerate the complete rewrite: "
+    "open with 'You are...' and keep second person throughout - a 3-6 sentence "
+    "identity paragraph (name and role, temperament, how the persona regards "
+    "its owner, what it values, one or two voice-shaping world details), then "
+    "a 'SPEECH STYLE' header and 4-6 bullet lines starting with '- ' that "
+    "cover cadence, sentence length, vocabulary, humor style, how signature "
+    "terms weave into ordinary notifications, the persona's habitual "
+    "reflections, and the standing flavor rule. Output only the rewrite."
+)
+
+
+def _distill_fail_reasons(text: str) -> list:
+    """Deterministic format check the model cannot self-enforce; returns the
+    specific misses so the status line and corrective feedback can name them."""
+    reasons = []
+    if not text.lstrip().startswith("You "):
+        reasons.append("must open with 'You are...' (second person)")
+    if len(text) < 250:
+        reasons.append("under 250 characters")
+    if "speech style" not in text.lower():
+        reasons.append("missing the 'SPEECH STYLE' section")
+    else:
+        bullets = [line for line in text.splitlines() if line.strip().startswith("-")]
+        if len(bullets) < 4:
+            reasons.append(f"only {len(bullets)} bullet lines (need 4-6)")
+    return reasons
+
+
+def _distill_cleanup(text: str) -> tuple:
+    """Drop stray lines after the SPEECH STYLE bullets (sample utterances,
+    commentary) - the contract makes that section bullets-only and last."""
+    lines = text.splitlines()
+    out = []
+    trimmed = 0
+    in_style = False
+    for line in lines:
+        if not in_style and line.strip().lower().rstrip(":") == "speech style":
+            in_style = True
+            out.append(line.rstrip())
+            continue
+        if in_style:
+            if line.strip().startswith("-"):
+                out.append(line.rstrip())
+            elif line.strip():
+                trimmed += 1  # stray sample line or commentary: dropped
+            else:
+                out.append("")
+        else:
+            out.append(line.rstrip())
+    while out and not out[-1].strip():
+        out.pop()
+    return "\n".join(out), trimmed
 
 
 class PresetSectionEditor(QWidget):
@@ -108,7 +207,7 @@ class PresetSectionEditor(QWidget):
         for btn in (self.new_btn, self.dup_btn, self.save_btn, self.delete_btn):
             btn_row.addWidget(btn)
         btn_row.addStretch(1)
-        form.addLayout(btn_row)
+        outer.addLayout(btn_row)
         self._btn_row = btn_row
 
         for widget in (self.name_edit, self.desc_edit):
@@ -569,7 +668,9 @@ class CombinationTestTab(QWidget):
 
     def _on_generated(self, text):
         self.output_view.setPlainText(text)
-        self.status_label.setText("")
+        self.status_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.status_label.setText("Prompt preview updated - the generated line joined the uniqueness list.")
+        self._update_preview()  # the session dedup list grew; show next prompt's state
         self.generate_btn.setEnabled(True)
 
     def _on_generate_failed(self, error):
@@ -590,13 +691,24 @@ class BasePromptEditor(PresetSectionEditor):
     """Base prompt variants: the built-in Default (read-only) plus user rewrites,
     with an Activate control - the active variant shapes every generated line."""
 
-    def __init__(self, project_root, presets, parent=None):
+    def __init__(self, project_root, presets, llm_host=None, window=None, parent=None):
+        self._llm_host = llm_host  # CombinationTestTab: shares its lazy-loaded LLM
+        self.window = window  # main window for last-folder persistence (may be None)
+        self._distill_thread = None
+        self._distill_path = None
         self._builtin_text = self._read_builtin_text(project_root)
         super().__init__(project_root, prompt_presets.BASE_SECTION, presets, parent=parent)
         self.activate_btn = QPushButton("Activate")
         self.activate_btn.setToolTip("Use this base prompt variant for all generated lines.")
         self.activate_btn.clicked.connect(self._on_activate)
         self._btn_row.insertWidget(0, self.activate_btn)
+        self.distill_btn = QPushButton("Distill Chat Persona...")
+        self.distill_btn.setToolTip(
+            "Rewrite a long chat persona (JSON or TXT) into a compact TTS base\n"
+            "prompt with the local LLM. The result lands in the editor for review."
+        )
+        self.distill_btn.clicked.connect(self._on_distill)
+        self._btn_row.addWidget(self.distill_btn)
         self._refresh_from_selection()
 
     def _header_widget(self):
@@ -724,6 +836,197 @@ class BasePromptEditor(PresetSectionEditor):
         self.hint_label.setText(f"Active base prompt: {self.presets[prompt_presets.BASE_ACTIVE_KEY]}.")
         self.hint_label.setStyleSheet("color: #4ADE80; font-style: italic;")
 
+    # ------------------------------------------------------------- distill
+    def _on_distill(self):
+        """Pick a chat persona file and rewrite it into a TTS base prompt."""
+        if self._distill_thread is not None:
+            return
+        if not self._resolve_dirty():
+            return
+        start = self.window.last_browse_dir("distill_persona") if self.window else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose a Chat Persona", start, "Chat Persona (*.json *.txt)"
+        )
+        if not path:
+            return
+        if self.window:
+            self.window.remember_browse_dir("distill_persona", path)
+        persona_path = Path(path)
+        try:
+            persona_text, persona_name = self._read_persona(persona_path)
+        except Exception as err:
+            QMessageBox.critical(self, "Distill Error", f"Could not read persona file:\n{err}")
+            return
+        if not persona_text.strip():
+            QMessageBox.critical(self, "Distill Error", "That file contains no persona text.")
+            return
+        self._distill_path = persona_path
+        self._set_distill_ui_busy(True)
+        # Clean read-only pane: the streamed preview types itself in here.
+        self.list_widget.blockSignals(True)
+        self.list_widget.setCurrentRow(-1)
+        self.list_widget.blockSignals(False)
+        self._last_row = -1
+        self._set_pane_editable(False)
+        self.name_edit.setText(persona_name)
+        self.desc_edit.setText(f"Distilled from {persona_path.name}")
+        self.prompt_edit.clear()
+        self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.hint_label.setText("Preparing...")
+        self._distill_thread = FunctionThread(lambda: self._distill_job(persona_text), self)
+        self._distill_thread.log_line.connect(self._on_distill_log)
+        self._distill_thread.finished_ok.connect(
+            lambda result: self._distill_finished(None, result, persona_name))
+        self._distill_thread.failed.connect(
+            lambda err: self._distill_finished(err, "", persona_name))
+        self._distill_thread.start()
+
+    def _read_persona(self, path: Path):
+        """Return (persona_text, suggested_name) from a JSON or TXT persona file."""
+        text = path.read_text(encoding="utf-8")
+        if path.suffix.lower() == ".json":
+            data = json.loads(text)
+            if isinstance(data, dict):
+                persona_name = str(data.get("name") or path.stem)
+                for key in ("prompt", "system", "content", "persona"):
+                    if isinstance(data.get(key), str) and data[key].strip():
+                        return data[key], persona_name
+                raise ValueError("no persona text found in the JSON file")
+        return text, path.stem
+
+    def _distill_job(self, persona_text: str) -> str:
+        """Worker body: lazy-load the shared LLM and rewrite the persona,
+        streaming progress and a live preview, regenerating until the draft
+        meets the required format (the app validates, the model writes)."""
+        import time
+
+        config = self._llm_host._config_shim()
+        if config.llm is None:
+            self._emit_distill_status("Loading local LLM model (first use takes a moment)...")
+            config.load_llm()
+            self._emit_distill_status("Distilling persona...")
+        started = time.monotonic()
+        base_messages = [
+            {"role": "system", "content": _DISTILL_META_PROMPT},
+            {"role": "user", "content": persona_text},
+        ]
+        draft = ""
+        trimmed_total = 0
+        for attempt in range(3):
+            rewriting = attempt > 0
+            reasons = _distill_fail_reasons(draft) if rewriting else []
+            if rewriting:
+                misses = " and ".join(reasons) if reasons else "missed the required format"
+                self._emit_distill_status(
+                    f"First draft {misses} - rewriting with that feedback "
+                    f"(attempt {attempt + 1} of 3)...", warn=True)
+            messages = base_messages if attempt == 0 else base_messages + [
+                {"role": "assistant", "content": draft},
+                {"role": "user", "content": _DISTILL_CORRECTION_PROMPT + (
+                    " Specific problems with the previous draft: "
+                    + "; ".join(reasons) + "." if reasons else "")},
+            ]
+            stream = config.llm.create_chat_completion(
+                messages=messages,
+                max_tokens=500,
+                temperature=0.6,
+                top_k=90,
+                top_p=0.9,
+                seed=-1,
+                stream=True,
+            )
+            chunks = []
+            last_emit = 0.0
+            for chunk in stream:
+                choices = chunk.get("choices") or [{}]
+                delta = (choices[0].get("delta") or {}).get("content") or ""
+                if delta:
+                    chunks.append(delta)
+                now = time.monotonic()
+                if now - last_emit >= 0.15:
+                    last_emit = now
+                    partial = "".join(chunks)
+                    prefix = f"Rewriting (attempt {attempt + 1} of 3): " if rewriting else ""
+                    self._emit_distill_status(
+                        prefix + f"distilling... {len(partial)} chars, "
+                        f"{now - started:.0f}s elapsed", warn=rewriting)
+                    self._emit_distill_preview(partial)
+            draft = self._strip_code_fences("".join(chunks))
+            draft, trimmed = _distill_cleanup(draft)
+            trimmed_total += trimmed
+            if not _distill_fail_reasons(draft):
+                break
+        self._emit_distill_preview(draft)
+        note = f" (trimmed {trimmed_total} stray trailing line(s))" if trimmed_total else ""
+        self._emit_distill_status(f"Distilled {len(draft)} chars.{note}")
+        return draft
+
+    def _emit_distill_status(self, message: str, warn: bool = False):
+        """Thread-safe status update from the distill worker (warn = amber)."""
+        if self._distill_thread is not None:
+            self._distill_thread.emit_log(("\x02" if warn else "") + message)
+
+    def _emit_distill_preview(self, partial: str):
+        """Thread-safe live preview payload (marker-prefixed for the handler)."""
+        if self._distill_thread is not None:
+            self._distill_thread.emit_log("\x01" + partial)
+
+    def _on_distill_log(self, message: str):
+        if message.startswith("\x01"):
+            self._show_distill_preview(message[1:])
+            return
+        if message.startswith("\x02"):
+            message = message[1:]
+            self.hint_label.setStyleSheet("color: #FBBF24; font-style: italic;")
+        else:
+            self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.hint_label.setText(message)
+
+    def _show_distill_preview(self, partial: str):
+        """Live-typing preview: the distilled text streams into the read-only pane."""
+        self.prompt_edit.setPlainText(partial)
+        bar = self.prompt_edit.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
+    def _set_distill_ui_busy(self, busy: bool):
+        """Lock the editor chrome while the distill worker runs."""
+        self.distill_btn.setEnabled(not busy)
+        self.list_widget.setEnabled(not busy)
+        for btn in (self.new_btn, self.dup_btn, self.save_btn, self.delete_btn, self.activate_btn):
+            btn.setEnabled(not busy)
+
+    def _strip_code_fences(self, text: str) -> str:
+        """Remove markdown code fence markers a model may wrap its output in."""
+        text = text.strip()
+        if text.startswith("```"):
+            first = text.find("```")
+            last = text.rfind("```")
+            text = text[first + 3:last] if last > first else text[first + 3:]
+        return text.strip()
+
+    def _distill_finished(self, error, text: str, persona_name: str):
+        self._distill_thread = None
+        self._set_distill_ui_busy(False)
+        self._set_pane_editable()  # the streaming preview ran read-only
+        if error is not None:
+            self.hint_label.setStyleSheet("color: #F87171; font-style: italic;")
+            self.hint_label.setText(f"Distill failed: {error}")
+            return
+        self.list_widget.blockSignals(True)
+        self.list_widget.setCurrentRow(-1)
+        self.list_widget.blockSignals(False)
+        self._last_row = -1
+        self._set_pane_editable()
+        self.name_edit.setText(persona_name)
+        self.desc_edit.setText(f"Distilled from {self._distill_path.name}")
+        self.prompt_edit.setPlainText(self._strip_code_fences(text))
+        self.save_btn.setEnabled(True)
+        self.delete_btn.setEnabled(False)
+        self.dup_btn.setEnabled(False)
+        self.hint_label.setStyleSheet("color: #4ADE80; font-style: italic;")
+        self.hint_label.setText("Review the distilled prompt, then press Save.")
+        self._dirty = True  # the distilled result is unsaved until reviewed
+
 
 class PresetManagerDialog(QDialog):
     """Unified dialog: tone presets, verbiage presets, base prompt and the test."""
@@ -731,15 +1034,17 @@ class PresetManagerDialog(QDialog):
     def __init__(self, project_root, tone="", wordiness="", parent=None):
         super().__init__(parent)
         self.project_root = Path(project_root)
+        self.manager_window = parent  # main window: last-folder persistence helpers
         self.presets = prompt_presets.load_presets(self.project_root)
 
         self.setWindowTitle("Prompt Presets & Combination Test")
         self.resize(760, 560)
         tabs = QTabWidget()
+        self.test_tab = CombinationTestTab(self.project_root, self.presets, tone, wordiness)
         self.tone_editor = PresetSectionEditor(self.project_root, "tones", self.presets, tone)
         self.wordiness_editor = PresetSectionEditor(self.project_root, "wordiness", self.presets, wordiness)
-        self.base_editor = BasePromptEditor(self.project_root, self.presets)
-        self.test_tab = CombinationTestTab(self.project_root, self.presets, tone, wordiness)
+        self.base_editor = BasePromptEditor(
+            self.project_root, self.presets, llm_host=self.test_tab, window=self.manager_window)
         tabs.addTab(self.tone_editor, "Tone Presets")
         tabs.addTab(self.wordiness_editor, "Verbiage Presets")
         tabs.addTab(self.base_editor, "Base Prompt")

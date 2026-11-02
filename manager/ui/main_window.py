@@ -286,10 +286,31 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def last_browse_dir(self, key: str) -> str:
+        """Last folder the user picked a file in (per dialog key), for reopen-here dialogs."""
+        try:
+            data = json.loads(self._ui_state_file().read_text(encoding="utf-8"))
+            return data.get("last_dirs", {}).get(key, "")
+        except Exception:
+            return ""
+
+    def remember_browse_dir(self, key: str, path: str):
+        """Persist the folder of a just-picked file so its dialog reopens there."""
+        try:
+            state_file = self._ui_state_file()
+            data = json.loads(state_file.read_text(encoding="utf-8")) if state_file.exists() else {}
+            data.setdefault("last_dirs", {})[key] = str(Path(path).parent)
+            state_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
+        except Exception:
+            pass
+
     def _save_window_state(self):
         try:
             b64 = bytes(self.saveGeometry().toBase64()).decode("ascii")
-            self._ui_state_file().write_text(json.dumps({"geometry": b64}), encoding="utf-8")
+            state_file = self._ui_state_file()
+            data = json.loads(state_file.read_text(encoding="utf-8")) if state_file.exists() else {}
+            data["geometry"] = b64
+            state_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
         except Exception:
             pass
 

@@ -21,13 +21,20 @@ _active_jobs_count = {}
 _jobs_lock = threading.Lock()
 
 
-def _effects_fingerprint(config) -> str:
-    """Short fingerprint of the current voice + effects era."""
+def _settings_fingerprint(config) -> str:
+    """Short fingerprint of the current voice, effects, and phrasing-style era."""
     try:
         payload = json.dumps(getattr(config, "voice_effects", {}), sort_keys=True, default=str)
     except Exception:
         payload = "unknown"
-    era = f"{getattr(config, 'tts_voice', '')}|{payload}"
+    era = "|".join([
+        str(getattr(config, "tts_voice", "")),
+        payload,
+        str(getattr(config, "current_tone", "")),
+        str(getattr(config, "current_wordiness", "")),
+        str(getattr(config, "player_name", "")),
+        str(getattr(config, "suit_voice_base", "")),
+    ])
     return hashlib.sha1(era.encode("utf-8")).hexdigest()[:12]
 
 
@@ -54,7 +61,7 @@ def record_mod_manifest(config, wem_id) -> None:
     manifest = load_mod_manifest(config)
     manifest[str(wem_id)] = {
         "voice": str(getattr(config, "tts_voice", "")),
-        "fingerprint": _effects_fingerprint(config),
+        "fingerprint": _settings_fingerprint(config),
     }
     save_mod_manifest(config, manifest)
 
@@ -137,7 +144,7 @@ def get_cached_wem(config, wem_id, top_up=True, rephrase=True, priority=0):
 
     # Clean target lookup ID
     id_str = str(wem_id).strip()
-    prefix = f"{id_str}_{_voice_tag(getattr(config, 'tts_voice', '') or 'unknown')}_"
+    prefix = f"{id_str}_{_voice_tag(getattr(config, 'tts_voice', '') or 'unknown')}_{_settings_fingerprint(config)}_"
 
     # Purge variants generated under a different voice/settings era
     for stale in wem_dir.glob("*.wem"):

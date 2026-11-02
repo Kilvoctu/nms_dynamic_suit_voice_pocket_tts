@@ -57,7 +57,7 @@ class SuitVoiceConfig:
         # --- RUNTIME SETTINGS ---
         runtime = self.environment.get("runtime", {})
         self.check_interval = float(runtime.get("check_interval", 0.1))
-        self.max_session_lines = int(runtime.get("max_session_lines", 25))
+        self.max_session_lines = int(runtime.get("max_session_lines", 10))
         self.quick_cache_max = int(runtime.get("quick_cache_max", 16))
 
         # ====================================================
@@ -246,7 +246,7 @@ class SuitVoiceConfig:
         new_cache_max = int(runtime.get("quick_cache_max", 16))
         _track("cache size", self.quick_cache_max, new_cache_max)
         self.quick_cache_max = new_cache_max
-        self.max_session_lines = int(runtime.get("max_session_lines", 25))
+        self.max_session_lines = int(runtime.get("max_session_lines", 10))
 
         paths = self.environment.get("paths", {})
         user_paths = user.get("paths", {})

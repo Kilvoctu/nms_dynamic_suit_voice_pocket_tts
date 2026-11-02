@@ -37,6 +37,9 @@ class PipelineBar(QFrame):
         self._close_pending = None  # callback to finish app close once stopped
         self._color = "#8a8a8a"
         self._full_text = "Status: checking..."
+        self._title_suffix = "Starting"
+        self._flash_until = 0.0  # monotonic deadline of a transient status message
+        self._flash_text = None
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 4, 10, 6)
@@ -86,6 +89,7 @@ class PipelineBar(QFrame):
     def _set_state(self, text: str, color: str, start_on: bool, stop_on: bool, title_suffix: str):
         self._color = color
         self._full_text = text
+        self._title_suffix = title_suffix
         self._render_status_text()
         self.status_dot.setStyleSheet(f"color: {color};")
         self.status_text.setStyleSheet(f"font-weight: bold; color: {color};")
@@ -96,6 +100,14 @@ class PipelineBar(QFrame):
             self.window.title_bar.set_title(f"NMS Dynamic Suit Voice - {title_suffix}")
         if hasattr(self.window, "set_tray_status"):
             self.window.set_tray_status(title_suffix)
+
+    def flash_message(self, text: str, color: str, seconds: int = 5):
+        """Temporarily override the status line (e.g. a purge or easter-egg
+        note); the next _refresh tick resumes the live pipeline status."""
+        self._flash_until = time.monotonic() + seconds
+        self._flash_text = (text, color)
+        self._set_state(text, color, self.start_btn.isEnabled(), self.stop_btn.isEnabled(),
+                        title_suffix=self._title_suffix)
 
     def _render_status_text(self):
         """Keep the status to a single line: elide the middle of the detail so
@@ -109,6 +121,10 @@ class PipelineBar(QFrame):
         self._render_status_text()
 
     def _refresh(self):
+        if self._flash_text is not None:
+            if time.monotonic() < self._flash_until:
+                return  # a flashed message owns the line until it expires
+            self._flash_text = None
         if self.window.setup_pending:
             self._set_state("Status: Setup required - run Setup in the System Environment tab.",
                             "#8a8a8a", False, False, "Setup Required")

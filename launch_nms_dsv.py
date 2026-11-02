@@ -17,6 +17,37 @@ import pystray
 
 import modular.pipeline_status as pipeline_status
 
+
+class _LineStamper:
+    """Prefix every complete stdout/stderr line with a local timestamp so the
+    pipeline log shows when each event happened (writes may arrive in pieces)."""
+
+    def __init__(self, stream):
+        self._stream = stream
+        self._buf = ""
+
+    def write(self, text):
+        self._buf += text
+        while "\n" in self._buf:
+            line, self._buf = self._buf.split("\n", 1)
+            self._stream.write(time.strftime("[%H:%M:%S] ") + line + "\n")
+
+    def flush(self):
+        if self._buf:
+            line, self._buf = self._buf, ""
+            self._stream.write(time.strftime("[%H:%M:%S] ") + line + "\n")
+        self._stream.flush()
+
+    def isatty(self):
+        return False
+
+
+if sys.stdout is not None:
+    sys.stdout = _LineStamper(sys.stdout)
+if sys.stderr is not None:
+    sys.stderr = _LineStamper(sys.stderr)
+
+
 ROOT = Path(__file__).parent
 MANAGED = "--managed" in sys.argv
 

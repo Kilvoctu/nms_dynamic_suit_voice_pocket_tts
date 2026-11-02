@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -31,7 +32,6 @@ class SystemTab(QWidget):
         super().__init__()
         self.window = window
         self._setup_thread = None
-        self._topup_thread = None
         self._log_offset = 0
         self._build_ui()
         self._sync_setup_button()
@@ -64,11 +64,11 @@ class SystemTab(QWidget):
         right_host = QWidget()
         right_scroll.setWidget(right_host)
         left = QVBoxLayout(left_host)
-        left.setContentsMargins(0, 0, 4, 0)
+        left.setContentsMargins(0, 0, 0, 0)
         right = QVBoxLayout(right_host)
-        right.setContentsMargins(4, 0, 0, 0)
+        right.setContentsMargins(0, 0, 0, 0)
         root_layout.addWidget(left_scroll, 5)
-        root_layout.addWidget(right_scroll, 6)
+        root_layout.addWidget(right_scroll, 4)
 
         pipeline_group = QGroupBox(" Voice Pipeline ")
         left.addWidget(pipeline_group)
@@ -80,6 +80,7 @@ class SystemTab(QWidget):
         self.autostart_cb.setChecked(
             bool(self.window.env_data.get("runtime", {}).get("autostart_pipeline", True))
         )
+        self.autostart_cb.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.autostart_cb.toggled.connect(self._save_autostart)
         self.autostart_cb.setToolTip(
             "Starts the voice engine automatically when this utility opens.\nTurning it off means you press Start in the bottom bar yourself."
@@ -93,19 +94,14 @@ class SystemTab(QWidget):
         )
         pipe_layout.addWidget(self.pipeline_log_btn)
 
-        pipe_hint = QLabel(
-            "Closing this window keeps the engine running in the tray. "
-            "Use the tray icon's Exit to stop the engine and quit."
-        )
-        pipe_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
-        pipe_hint.setWordWrap(True)
-        pipe_layout.addWidget(pipe_hint)
-
         paths_group = QGroupBox(" Core Platform File Infrastructure ")
-        right.addWidget(paths_group)
+        left.addWidget(paths_group)
         paths_layout = QVBoxLayout(paths_group)
 
         paths_layout.addWidget(QLabel("No Man's Sky Target Mod Directory:"))
+        dir_label = paths_layout.itemAt(paths_layout.count() - 1).widget()
+        dir_label.setWordWrap(True)
+        dir_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         row = QHBoxLayout()
         stored = (self.window.user_data.get("paths", {}).get("mod_dir")
                   or self.window.env_data.get("paths", {}).get("mod_dir", ""))
@@ -113,6 +109,8 @@ class SystemTab(QWidget):
         # at consumption time by modular.path_utils.
         display = str(resolve_mod_root(stored)) if stored else ""
         self.mod_dir_edit = QLineEdit(display)
+        self.mod_dir_edit.setPlaceholderText(
+            "C:/Program Files (x86)/Steam/steamapps/common/No Man's Sky/GAMEDATA/MODS/")
         self.mod_dir_edit.textChanged.connect(self._sync_setup_button)
         self.mod_dir_edit.setToolTip(
             "The game's GAMEDATA/MODS folder (Steam or Xbox).\nThe DYNAMIC_SUIT_VOICE sub-path is handled automatically."
@@ -122,16 +120,10 @@ class SystemTab(QWidget):
         browse_btn.clicked.connect(self._browse_mod_directory)
         row.addWidget(browse_btn)
         paths_layout.addLayout(row)
-        hint = QLabel(
-            "\u21b3 Example: C:/Program Files (x86)/Steam/steamapps/common/No Man's Sky/GAMEDATA/MODS/"
-        )
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
-        paths_layout.addWidget(hint)
 
         # First-time setup -------------------------------------------------
         setup_group = QGroupBox(" First-Time Setup ")
-        right.addWidget(setup_group)
+        left.addWidget(setup_group)
         setup_layout = QVBoxLayout(setup_group)
 
         self.setup_btn = QPushButton("Setup")
@@ -145,6 +137,7 @@ class SystemTab(QWidget):
 
         self.setup_hint = QLabel("Enter a mod directory above to enable Setup.")
         self.setup_hint.setWordWrap(True)
+        self.setup_hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.setup_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
         setup_layout.addWidget(self.setup_hint)
 
@@ -155,37 +148,23 @@ class SystemTab(QWidget):
         self.setup_log.setVisible(False)  # only shown while Setup actually runs
         setup_layout.addWidget(self.setup_log)
 
-        # Maintenance ------------------------------------------------------
-        maintenance = QGroupBox(" Exosuit Core Maintenance Deck ")
+        # Troubleshooting ----------------------------------------------------
+        maintenance = QGroupBox(" Troubleshooting ")
         left.addWidget(maintenance)
         maint_layout = QVBoxLayout(maintenance)
 
-        # Maintenance buttons stack vertically: the row would clip at narrow
-        # window widths (pushbuttons don't wrap or elide their labels).
-        self.topup_btn = QPushButton("Execute Cache Top-Up Sequence")
-        self.topup_btn.clicked.connect(self._run_async_topup)
-        self.topup_btn.setToolTip(
-            "Optional: pre-generates rephrased voice variants for every active line\n"
-            "so repeated lines vary instantly in-game. Slow - the pipeline also\n"
-            "fills this automatically while you play."
-        )
-        maint_layout.addWidget(self.topup_btn)
-        self.purge_btn = QPushButton("Wipe Local Cached Wave Streams")
+        self.purge_btn = QPushButton("Wipe Cached Voice Variants")
         self.purge_btn.clicked.connect(self._purge_audio_cache)
         self.purge_btn.setToolTip(
-            "Emergency cleanup: deletes cached voice variants and temp renders\n"
-            "(model weights untouched). Normally unnecessary - the mod manages\n"
-            "this cache automatically."
+            "Emergency cleanup: deletes all cached voice variants and temp renders\n"
+            "(model weights untouched) for a clean rebuild. Rarely needed - the\n"
+            "mod manages this cache automatically and re-fills it as you play."
         )
         maint_layout.addWidget(self.purge_btn)
 
-        self.status_label = QLabel("Deck Systems Status: Idle")
-        self.status_label.setStyleSheet("font-weight: bold; color: #4ADE80;")
-        maint_layout.addWidget(self.status_label)
-
         # Live pipeline console: tails cache/pipeline.log
         log_group = QGroupBox(" Pipeline Log ")
-        left.addWidget(log_group, 1)
+        right.addWidget(log_group, 1)
         log_layout = QVBoxLayout(log_group)
         self.pipeline_log_view = QPlainTextEdit()
         self.pipeline_log_view.setReadOnly(True)
@@ -196,8 +175,8 @@ class SystemTab(QWidget):
         log_layout.addWidget(self.pipeline_log_view)
 
         # RIGHT PANE: hot stove burner vault --------------------------------
-        vault_group = QGroupBox(" Advanced Signal Diagnostics (Hot Stove Burner Vault) ")
-        right.addWidget(vault_group, 1)
+        vault_group = QGroupBox(" Advanced Signal Diagnostics ")
+        left.addWidget(vault_group, 1)
         vault_layout = QVBoxLayout(vault_group)
 
         self.warning_text = (
@@ -230,10 +209,12 @@ class SystemTab(QWidget):
         )
         self.warning_label = QLabel(self._vault_brief)
         self.warning_label.setWordWrap(True)
+        self.warning_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.warning_label.setStyleSheet("color: #F87171; font-style: italic;")
         vault_layout.addWidget(self.warning_label)
 
-        self.accept_responsibility = QCheckBox("I ACCEPT ALL ULTIMATE RESPONSIBILITY AND TOUCH THE BURNER")
+        self.accept_responsibility = QCheckBox("I ACCEPT ALL RESPONSIBILITY AND TOUCH THE BURNER")
+        self.accept_responsibility.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.accept_responsibility.toggled.connect(self._toggle_stove_burner_lock)
         lore = (
             self.warning_text.replace("&", "&amp;").replace("<", "&lt;")
@@ -250,8 +231,15 @@ class SystemTab(QWidget):
         self.cache_max_spin.setToolTip(
             "How many alternate wordings are kept per active line.\nMore = more variety, more disk + generation time."
         )
-        vault_layout.addWidget(QLabel("Exosuit Pre-Cache Max Threshold Horizon:"))
-        vault_layout.addWidget(self.cache_max_spin)
+        horizon_row = QHBoxLayout()
+        horizon_label = QLabel("Exosuit Pre-Cache Max Threshold Horizon:")
+        horizon_label.setWordWrap(True)
+        horizon_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        # Label takes the row's width (wrapping if needed), input pins right.
+        horizon_row.addWidget(horizon_label, 1)
+        self.cache_max_spin.setFixedWidth(110)
+        horizon_row.addWidget(self.cache_max_spin)
+        vault_layout.addLayout(horizon_row)
 
         self.interval_spin = QDoubleSpinBox()
         self.interval_spin.setRange(0.01, 5.0)
@@ -262,8 +250,14 @@ class SystemTab(QWidget):
         self.interval_spin.setToolTip(
             "How often the pipeline scans the game folder for newly played lines.\nLeave this alone unless lines feel delayed."
         )
-        vault_layout.addWidget(QLabel("Filesystem Scan Pool Tick Interval (Seconds):"))
-        vault_layout.addWidget(self.interval_spin)
+        interval_row = QHBoxLayout()
+        interval_label = QLabel("Filesystem Scan Pool Tick Interval (Seconds):")
+        interval_label.setWordWrap(True)
+        interval_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        interval_row.addWidget(interval_label, 1)
+        self.interval_spin.setFixedWidth(110)
+        interval_row.addWidget(self.interval_spin)
+        vault_layout.addLayout(interval_row)
         vault_layout.addStretch(1)
 
     # ------------------------------------------------------------ helpers
@@ -288,9 +282,6 @@ class SystemTab(QWidget):
 
     def _append_log(self, message: str):
         self.setup_log.appendPlainText(message)
-
-    def _append_topup_log(self, message: str):
-        self.pipeline_log_view.appendPlainText(message)
 
     # ----------------------------------------------------- pipeline settings
     def _tail_pipeline_log(self):
@@ -337,8 +328,10 @@ class SystemTab(QWidget):
             pass
 
     def _set_status(self, text: str, color: str):
-        self.status_label.setText(f"Deck Systems Status: {text}")
-        self.status_label.setStyleSheet(f"font-weight: bold; color: {color};")
+        """Flash a transient message in the main status bar (bottom strip)."""
+        bar = getattr(self.window, "pipeline_bar", None)
+        if bar is not None:
+            bar.flash_message(f"Status: {text}", color, 5)
 
     # -------------------------------------------------------------- setup
     def _run_setup(self):
@@ -391,65 +384,6 @@ class SystemTab(QWidget):
             self.setup_hint.setStyleSheet("color: #F87171; font-style: italic;")
             QMessageBox.critical(self, "Setup Failed", f"Setup encountered an issue:\n{error}")
 
-    # ------------------------------------------------------------- top-up
-    def _run_async_topup(self):
-        # Warn up front: a full top-up renders used-lines x variants and takes
-        # hours on CPU. It is incremental and safe to stop at any point.
-        from modular.config import SuitVoiceConfig
-
-        used_count = sum(
-            1 for entry in SuitVoiceConfig(init_llm=False).intent_map.values()
-            if str(entry.get("Used", "")).strip().lower() == "yes"
-        )
-        answer = QMessageBox.question(
-            self, "Cache Top-Up Sequence",
-            f"Fill the variation cache for up to {used_count} used voice lines\n"
-            f"to {self.cache_max_spin.value()} variants each.\n\n"
-            "This renders in the background and can take HOURS on CPU.\n"
-            "It is incremental - stopping keeps whatever is already rendered.\n\nStart the top-up?",
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        self.topup_btn.setEnabled(False)
-        self._set_status("Cache top-up running - watch the log...", "#FBBF24")
-        # Read the spinbox on the GUI thread; the worker never touches widgets.
-        self._topup_max = int(self.cache_max_spin.value())
-        self._topup_thread = _start_thread(self, self._topup_job, self._topup_finished)
-        # Top-up progress belongs in the Pipeline Log, not the setup console.
-        self._topup_thread.log_line.disconnect()
-        self._topup_thread.log_line.connect(self._append_topup_log)
-
-    def _topup_job(self):
-        from modular.config import SuitVoiceConfig
-
-        self._topup_thread.emit_log(
-            " [TopUp] Loading the local model for rendering (this can take a minute)..."
-        )
-        heavy_config = SuitVoiceConfig(init_llm=False)
-        wem_ids = [
-            wem_id
-            for wem_id, entry in heavy_config.intent_map.items()
-            if str(entry.get("Used", "")).strip().lower() == "yes"
-        ]
-        if not wem_ids:
-            raise RuntimeError("No 'Used: yes' entries found in the intent map.")
-        from extras.cache_topup_to_max import fill_cache_for_ids
-
-        def progress(index, total, wem_id, missing):
-            note = f"rendering {missing} variant(s)" if missing else "already full"
-            self._topup_thread.emit_log(f" [TopUp] {index}/{total} -> WEM {wem_id} ({note})")
-
-        fill_cache_for_ids(wem_ids, max_count=getattr(self, "_topup_max", 16), progress=progress)
-        return len(wem_ids)
-
-    def _topup_finished(self, ok: bool, error: str | None, count=None):
-        self.topup_btn.setEnabled(True)
-        self._set_status("Idle", "#4ADE80")
-        if ok:
-            QMessageBox.information(self, "Success", "Vocal variation buffer populating complete!")
-        else:
-            QMessageBox.critical(self, "Error", f"Cache generation sequence encountered an issue: {error}")
-
     # -------------------------------------------------------------- purge
     def _purge_audio_cache(self):
         if is_pipeline_running():
@@ -470,7 +404,6 @@ class SystemTab(QWidget):
         try:
             purged = purge_cache_audio(self.window.project_root, self.window.env_data)
             QMessageBox.information(self, "Success", f"Exosuit local audio storage purged cleanly ({purged} files)!")
-            self._set_status("Storage Purged Clean", "#4ADE80")
         except Exception as err:
             QMessageBox.critical(self, "Purge Error", f"Could not flush file boundaries: {err}")
 
@@ -487,7 +420,6 @@ class SystemTab(QWidget):
             self.interval_spin.setEnabled(False)
             self.warning_label.setText(self._vault_brief)
             self.warning_label.setStyleSheet("color: #F87171; font-style: italic;")
-            self._set_status("Idle", "#4ADE80")
 
 
 def _start_thread(tab, fn, finished_handler):

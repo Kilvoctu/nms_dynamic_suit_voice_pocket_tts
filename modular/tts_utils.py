@@ -29,6 +29,38 @@ POCKET_DEFAULT_VOICE = "fantine"
 # Measured: wav2wem's oggenc2 stage costs ~0.9 dB integrated LUFS on float input.
 WEM_ENCODER_COMPENSATION_DB = 0.9
 
+def _repair_flattened_hf_links(project_root):
+    """Rebuild HF cache symlinks that copy tools flatten into path-text files;
+    unresolvable ones are dropped so the online fallback re-downloads them."""
+    hub = Path(project_root) / "cache" / "hub"
+    if not hub.is_dir():
+        return
+    for path in list(hub.rglob("*")):
+        if path.is_dir() or path.is_symlink():
+            continue
+        try:
+            if path.stat().st_size > 400:
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore").strip()
+        except OSError:
+            continue
+        if not text or "\n" in text or not text.startswith(".."):
+            continue
+        target = (path.parent / text).resolve()
+        if not target.exists():
+            path.unlink(missing_ok=True)
+            print(f"[TTS] Removed broken cache link {path} (flattened); it will re-download.")
+            continue
+        if target.is_file():
+            shutil.copy2(target, path)
+        else:
+            path.unlink(missing_ok=True)
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(path), str(target)],
+                           capture_output=True, creationflags=flags)
+        print(f"[TTS] Repaired flattened cache link: {path.name}")
+
+
 _pocket_model = None
 _pocket_voice_states = {}
 _pocket_model_lock = threading.Lock()
@@ -99,6 +131,10 @@ def get_pocket_model(model_name: str = POCKET_DEFAULT_MODEL, project_root="."):
     with _pocket_model_lock:
         if _pocket_model is None:
             _ensure_pocket_cache_env(project_root)
+            try:
+                _repair_flattened_hf_links(project_root)
+            except Exception as r_e:
+                print(f"[TTS] Cache link check skipped: {r_e}")
             # Imported here so importing this module never pulls in torch.
             from pocket_tts import TTSModel
 
@@ -254,12 +290,14 @@ def _resolve_ffmpeg() -> str:
     return "ffmpeg"  # fall through: subprocess will raise a clear error
 
 
-def _measure_loudness(ffmpeg_bin: str, wav_path: Path, create_no_window: int):
-    """First loudnorm pass: return the measured JSON stats, or None on failure."""
+def _measure_loudness(ffmpeg_bin: str, wav_path: Path, create_no_window: int, pre_filter: str = ""):
+    """First loudnorm pass: return the measured JSON stats, or None on failure.
+    pre_filter filters are applied before analysis (measures the post-chain audio)."""
     import re
+    analysis_chain = f"{pre_filter},loudnorm=print_format=json" if pre_filter else "loudnorm=print_format=json"
     result = subprocess.run(
         [ffmpeg_bin, "-hide_banner", "-i", str(wav_path),
-         "-af", "loudnorm=print_format=json", "-f", "null", "-"],
+         "-af", analysis_chain, "-f", "null", "-"],
         capture_output=True, text=True, creationflags=create_no_window,
     )
     match = re.search(r'\{[^{}]*"input_i"[^{}]*\}', result.stderr or "")
@@ -275,34 +313,37 @@ def _measure_loudness(ffmpeg_bin: str, wav_path: Path, create_no_window: int):
 
 
 def apply_loudness_normalization(ffmpeg_bin: str, wav_path: Path, loudness_target: float,
-                                 create_no_window: int = 0, true_peak: float = 5.0) -> bool:
+                                 create_no_window: int = 0, true_peak: float = 5.0,
+                                 initial_stats=None, pre_chain: str = "") -> bool:
     """Gain toward the loudness target with a true-peak limiter cap; iterates
-    until the target holds (limiting steals loudness, so it re-measures)."""
+    until the target holds (limiting steals loudness, so it re-measures).
+    initial_stats: pre-measured stats for the audio pre_chain transforms, saving
+    one analysis spawn; pre_chain rides the first apply pass (creative filters)."""
     create_no_window = create_no_window or (0x08000000 if sys.platform == "win32" else 0)
-    stats = _measure_loudness(ffmpeg_bin, wav_path, create_no_window)
-    if not stats:
-        return False
-    try:
-        measured_i = float(stats["input_i"])
-    except (KeyError, TypeError, ValueError):
-        return False
-    # Iterate: gain toward the target (+0.9 compensation pre-empts wav2wem's
-    # oggenc2 LUFS loss), then a lookahead limiter caps true peaks at the ceiling.
-    # Limiting steals some loudness, so measure again and correct, up to 5 passes.
-    # alimiter's limit tops out at 1.0, so the signal is scaled down by the
-    # ceiling before it and restored after.
+    stats = initial_stats
+    if stats is not None:
+        try:
+            float(stats["input_i"])
+        except (KeyError, TypeError, ValueError):
+            stats = None
     tmp_path = wav_path.with_suffix(".loudnorm.wav")
     try:
         for _ in range(5):
-            stats = _measure_loudness(ffmpeg_bin, wav_path, create_no_window)
-            if not stats:
-                return False
+            if stats is None:
+                stats = _measure_loudness(ffmpeg_bin, wav_path, create_no_window)
+                if not stats:
+                    return False
             try:
                 measured_i = float(stats["input_i"])
             except (KeyError, TypeError, ValueError):
                 return False
+            # Iterate: gain toward the target (+0.9 compensation pre-empts wav2wem's
+            # oggenc2 LUFS loss), then a lookahead limiter caps true peaks at the ceiling.
+            # Limiting steals some loudness, so measure again and correct, up to 5 passes.
+            # alimiter's limit tops out at 1.0, so the signal is scaled down by the
+            # ceiling before it and restored after.
             gain_db = loudness_target - measured_i + WEM_ENCODER_COMPENSATION_DB
-            if abs(gain_db) <= 0.4:
+            if abs(gain_db) <= 0.4 and not pre_chain:
                 return True
             gain_db = max(min(gain_db, 12.0), -12.0)
             # Keep 2 dB of sample-peak headroom below the ceiling: hard-clipped
@@ -314,10 +355,12 @@ def apply_loudness_normalization(ffmpeg_bin: str, wav_path: Path, loudness_targe
                 f"alimiter=limit=1:attack=5:release=50,"
                 f"volume={10 ** (sample_ceiling / 20):.6f}"
             )
+            chain = f"{pre_chain},{limiter_chain}" if pre_chain else limiter_chain
+            pre_chain = ""  # creative filters only ride the first apply pass
             result = subprocess.run(
                 [ffmpeg_bin, "-hide_banner", "-y",
                  "-i", str(wav_path),
-                 "-af", limiter_chain,
+                 "-af", chain,
                  "-ar", "22050",
                  "-c:a", "pcm_f32le",  # float output: allows true peak above 0 dBFS
                  str(tmp_path)],
@@ -328,6 +371,7 @@ def apply_loudness_normalization(ffmpeg_bin: str, wav_path: Path, loudness_targe
                     tmp_path.unlink()
                 return False
             tmp_path.replace(wav_path)
+            stats = None  # the audio changed: re-measure next iteration
         return True
     finally:
         if tmp_path.exists():
@@ -385,48 +429,16 @@ def apply_vocal_dsp_chain(input_wav: Path, output_wav: Path,
         wf.setframerate(sr)
         wf.writeframes(audio_bytes)
 
-    # 3. RUN FFMPEG PASSTHROUGH TO APPLY VOLUME & SENTENCE SPEED SEAMLESSLY
+    # 3. One ffmpeg pass: the creative chain (volume/tempo/rate) rides into the
+    #    first loudnorm apply instead of its own spawn; loudness is measured with
+    #    the chain pre-applied so the linear gain math stays exact. The apply's
+    #    -ar 22050 locks the game-engine sample rate (replaces the old resample).
     CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
     setrate_val = int(44100 * rate)
     ffmpeg_bin = _resolve_ffmpeg()
-
-    # We strip input_wav out and stream directly onto output_wav
-    subprocess.run([
-        ffmpeg_bin, "-hide_banner", "-y",
-        "-i", str(output_wav),
-        "-af", f"volume={gain_db}dB,atempo={tempo},asetrate={setrate_val}",
-        str(input_wav)  # Overwrite temporary tracking target
-    ],
-        check=True,
-        creationflags=CREATE_NO_WINDOW,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
-    )
-
-    # Final downsample filter match step to lock target frequencies to the game engine
-    with wave.open(str(input_wav), "rb") as wf:
-        sr = wf.getframerate()
-        audio = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32)
-
-    if sr != target_sr:
-        n_samples = max(int(len(audio) * target_sr / sr), MIN_SAMPLES)
-        audio = resample(audio, n_samples)
-        sr = target_sr
-
-    # Clip guard only: a blanket peak normalize would undo the loudnorm headroom
-    if np.max(np.abs(audio)) > 32767:
-        audio = audio / np.max(np.abs(audio)) * 32767
-    final_bytes = audio.astype(np.int16).tobytes()
-
-    with wave.open(str(output_wav), "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sr)
-        wf.writeframes(final_bytes)
-
-    # 4. Two-pass loudness normalization: pins every line to the target LUFS so it
-    # stays audible against the game's mastered soundscape.
+    pre_chain = f"volume={gain_db}dB,atempo={tempo},asetrate={setrate_val}"
+    stats = _measure_loudness(ffmpeg_bin, output_wav, CREATE_NO_WINDOW, pre_filter=pre_chain)
     apply_loudness_normalization(
         ffmpeg_bin, output_wav, loudness_target, CREATE_NO_WINDOW,
-        true_peak=loudness_true_peak
+        true_peak=loudness_true_peak, initial_stats=stats, pre_chain=pre_chain
     )

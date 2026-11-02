@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
     QGroupBox,
@@ -23,6 +25,8 @@ from PySide6.QtWidgets import (
 
 from modular import tts_utils
 from ui.workers import FunctionThread
+
+_POCKET_TTS_TERMS_URL = "https://huggingface.co/kyutai/pocket-tts"
 
 _BASE_CATALOG = {
     "marius": ("Marius", "MALE"),
@@ -50,6 +54,7 @@ class VoiceModelTab(QWidget):
         self.window = window
         self._warm_thread = None
         self._clone_thread = None
+        self._setup_thread = None
         self._clone_sample_path = None
         self._clone_auth_hint = False
         self._clone_log_tail = []
@@ -158,6 +163,29 @@ class VoiceModelTab(QWidget):
         self.clone_btn.clicked.connect(self._trigger_async_clone)
         clone_layout.addWidget(self.clone_btn)
 
+        setup_group = QGroupBox(" First-time Cloning Setup ")
+        self.setup_group = setup_group
+        right.addWidget(setup_group)
+        setup_layout = QVBoxLayout(setup_group)
+        setup_hint = QLabel("The first clone needs a one-time Hugging Face sign-in and model download.")
+        setup_hint.setWordWrap(True)
+        setup_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        setup_layout.addWidget(setup_hint)
+        row = QHBoxLayout()
+        self.terms_btn = QPushButton("Open Terms Page")
+        self.terms_btn.setToolTip("Accept the model's terms on huggingface.co (free account).")
+        self.terms_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(_POCKET_TTS_TERMS_URL)))
+        row.addWidget(self.terms_btn)
+        self.setup_btn = QPushButton("Sign in && Preload Model")
+        self.setup_btn.setToolTip(
+            "Opens a Hugging Face sign-in window, saves the token for cloning and\n"
+            "pre-downloads the cloning model so Clone Voice never waits on it."
+        )
+        self.setup_btn.clicked.connect(self._trigger_voice_setup)
+        row.addWidget(self.setup_btn)
+        setup_layout.addLayout(row)
+
     # -------------------------------------------------------------- catalog
     def _pocket_model(self) -> str:
         """Configured Pocket TTS model key, falling back to the code default."""
@@ -198,6 +226,25 @@ class VoiceModelTab(QWidget):
             if "\u25b6" in self.voice_list.item(index).text():
                 self.voice_list.setCurrentRow(index)
                 break
+        self._update_setup_visibility()
+
+    def _cloning_ready(self) -> bool:
+        """True when cloning can proceed without the setup button: the gated
+        cloning model is cached locally, or a Hugging Face credential exists."""
+        if os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"):
+            return True
+        if (Path.home() / ".cache" / "huggingface" / "token").is_file():
+            return True
+        if (self.window.project_root / "cache" / "token").is_file():
+            return True
+        model_key = self._pocket_model()
+        hub = self.window.project_root / "cache" / "hub"
+        return any(
+            hub.glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{model_key}/*.safetensors"))
+
+    def _update_setup_visibility(self):
+        """The first-time setup group only shows when cloning is not ready yet."""
+        self.setup_group.setVisible(not self._cloning_ready())
 
     def _voice_ready(self, key: str) -> bool:
         if key in tts_utils.PREDEFINED_POCKET_VOICES:
@@ -307,6 +354,90 @@ class VoiceModelTab(QWidget):
             QMessageBox.information(self, "Success", "Cloned voice removed cleanly.")
         except Exception as e:
             QMessageBox.critical(self, "Purge Failure", f"Could not remove voice folder modules: {e}")
+
+    # ---------------------------------------------------- first-time setup
+    def _setup_emit(self, message: str):
+        """Thread-safe phase text into the download progress label."""
+        if self._setup_thread is not None:
+            self._setup_thread.emit_log(str(message)[:160])
+
+    def _trigger_voice_setup(self):
+        """One-time Hugging Face sign-in + cloning-model preload."""
+        if self._setup_thread is not None:
+            return
+        self.setup_btn.setEnabled(False)
+        self.download_progress.setText("Setup: opening the Hugging Face sign-in window...")
+        self._setup_thread = FunctionThread(self._voice_setup_job, self)
+        self._setup_thread.log_line.connect(self.download_progress.setText)
+        self._setup_thread.finished_ok.connect(lambda _r: self._setup_finished(None))
+        self._setup_thread.failed.connect(self._setup_finished)
+        self._setup_thread.start()
+
+    def _voice_setup_job(self):
+        py_exe = Path(sys.executable).with_name("python.exe")
+        if not py_exe.is_file():
+            py_exe = Path(sys.executable)
+        # 1. Interactive login in its own console (the manager runs windowless).
+        self._setup_emit("A sign-in window has opened - paste your Hugging Face access token there.")
+        proc = subprocess.Popen(
+            [str(py_exe), "-m", "huggingface_hub.commands.huggingface_cli", "login"],
+            cwd=str(self.window.project_root),
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+        rc = proc.wait()
+        if rc != 0:
+            self._setup_emit(f"Sign-in window exited with code {rc} (you can retry).")
+        # 2. Bridge the token into the project HF cache (HF_HOME-derived token path).
+        sys_tok = Path.home() / ".cache" / "huggingface" / "token"
+        loc_tok = self.window.project_root / "cache" / "token"
+        if sys_tok.is_file() and not loc_tok.exists():
+            loc_tok.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(sys_tok, loc_tok)
+        self._setup_emit("Token saved for cloning.")
+        # 3. Preload the pinned cloning model into the project cache (streams progress).
+        model_key = self._pocket_model()
+        root = self.window.project_root
+        code = (
+            "import os; from pathlib import Path; "
+            f"root = Path({str(root)!r}); p = root / 'cache'; "
+            "os.environ['HF_HOME'] = str(p); "
+            "os.environ['HF_HUB_CACHE'] = str(p / 'hub'); "
+            "os.environ['HUGGINGFACE_HUB_CACHE'] = str(p / 'hub'); "
+            "from pocket_tts import TTSModel; "
+            f"TTSModel.load_model(language={model_key!r}); print('Cloning model ready.')"
+        )
+        env = dict(os.environ)
+        for flag in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
+            env.pop(flag, None)
+        tts_utils._ensure_pocket_cache_env(root)
+        if not env.get("HF_TOKEN") and sys_tok.is_file():
+            env["HF_TOKEN"] = sys_tok.read_text(encoding="utf-8").strip()
+        proc = subprocess.Popen(
+            [str(py_exe), "-c", code],
+            cwd=str(root), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace",
+            creationflags=0x08000000 if sys.platform == "win32" else 0,
+        )
+        for line in proc.stdout:
+            if line.strip():
+                self._setup_emit(line.rstrip())
+        proc.wait()
+        if proc.returncode != 0:
+            raise RuntimeError(f"Model preload failed (exit code {proc.returncode})")
+
+    def _setup_finished(self, error):
+        self._setup_thread = None
+        self.setup_btn.setEnabled(True)
+        if error is None:
+            self.download_progress.setText("Setup Queue: Sign-in and model preload complete.")
+            QMessageBox.information(
+                self, "Success",
+                "Hugging Face sign-in saved and the cloning model is preloaded.\n"
+                "Clone Voice is ready to run fully offline from here on.")
+            self._refresh_catalog()
+        else:
+            self.download_progress.setText("Setup Queue: Failed.")
+            QMessageBox.critical(self, "Setup Failed", f"Voice cloning setup failed:\n{error}")
 
     # --------------------------------------------------------------- cloning
     def _choose_clone_sample(self):
@@ -427,8 +558,9 @@ class VoiceModelTab(QWidget):
             tail = "\n".join(self._clone_log_tail[-4:])
             hint = ""
             if self._clone_auth_hint:
-                hint = ("\n\nLog in once with 'hf auth login' (free HuggingFace account,\n"
-                        "accept the model's terms) and retry.")
+                self.setup_group.setVisible(True)  # one click from fixed
+                hint = ("\n\nPress 'Sign in & Preload Model' in the Voice Model tab\n"
+                        "(one-time Hugging Face sign-in), then retry.")
             QMessageBox.critical(
                 self, "Clone Failed",
                 f"Cloning '{name}' failed:\n{error}\n\nLast log lines:\n{tail}{hint}",

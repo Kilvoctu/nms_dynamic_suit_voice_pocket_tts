@@ -1,14 +1,16 @@
 # manager/ui/tabs_profile.py - user identity, briefing text and prompt preferences.
 import json
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QComboBox,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -52,43 +54,89 @@ class ProfileTab(QWidget):
         prefs_layout = QVBoxLayout(prefs)
         self._presets = prompt_presets.load_presets(window.project_root)
 
-        row1 = QHBoxLayout()
-        prefs_layout.addLayout(row1)
-        row1.addWidget(QLabel("Companion AI Tone Profile:"))
+        grid = QGridLayout()
+        grid.setColumnStretch(3, 1)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(10)
+        prefs_layout.addLayout(grid)
+
+        def _desc_label(ignored: bool):
+            lbl = QLabel("")
+            lbl.setStyleSheet("color: #8a8a8a; font-style: italic;")
+            if ignored:
+                lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            return lbl
+
+        grid.addWidget(QLabel("AI Core:"), 0, 0)
+        self.base_combo = QComboBox()
+        self.base_combo.setFixedWidth(220)
+        self.base_combo.setToolTip(
+            "The core instruction block shaping the AI's personality - 'Default' is the\n"
+            "built-in prompt; other entries are your custom variants (Manage to edit).\n"
+            "Switching takes effect when you press Apply Changes."
+        )
+        grid.addWidget(self.base_combo, 0, 1)
+        self.manage_btn = QPushButton("Manage")
+        self.manage_btn.setToolTip("Inspect prompt texts, manage custom presets and test tone + verbiage combinations.")
+        self.manage_btn.clicked.connect(self._manage_prompts)
+        grid.addWidget(self.manage_btn, 0, 3, Qt.AlignmentFlag.AlignRight)
+        self.base_desc = _desc_label(ignored=False)
+        grid.addWidget(self.base_desc, 0, 2)
+
+        grid.addWidget(QLabel("Tone Profile:"), 1, 0)
         self.tone_combo = QComboBox()
+        self.tone_combo.setFixedWidth(220)
         self._populate_combo(self.tone_combo, "tones", window.available_tones)
         self.tone_combo.setCurrentText(phrase_settings.get("tone", "Standard"))
-        row1.addWidget(self.tone_combo)
-        row1.addStretch(1)
-        manage_btn = QPushButton("Manage")
-        manage_btn.setToolTip("Inspect prompt texts, manage custom presets and test tone + verbiage combinations.")
-        manage_btn.clicked.connect(self._manage_prompts)
-        row1.addWidget(manage_btn)
-        self.tone_desc = QLabel("")
-        self.tone_desc.setStyleSheet("color: #8a8a8a; font-style: italic;")
-        self.tone_desc.setWordWrap(True)
-        self.tone_desc.setContentsMargins(24, 0, 0, 0)
-        prefs_layout.addWidget(self.tone_desc)
+        grid.addWidget(self.tone_combo, 1, 1)
+        self.tone_desc = _desc_label(ignored=True)
+        grid.addWidget(self.tone_desc, 1, 2, 1, 2)
 
-        row2 = QHBoxLayout()
-        prefs_layout.addLayout(row2)
-        row2.addWidget(QLabel("Companion AI Verbiage Style:"))
+        grid.addWidget(QLabel("Verbiage Style:"), 2, 0)
         self.wordiness_combo = QComboBox()
+        self.wordiness_combo.setFixedWidth(220)
         self._populate_combo(self.wordiness_combo, "wordiness", window.available_wordiness)
         self.wordiness_combo.setCurrentText(phrase_settings.get("wordiness", "Standard"))
-        row2.addWidget(self.wordiness_combo)
-        row2.addStretch(1)
-        self.wordiness_desc = QLabel("")
-        self.wordiness_desc.setStyleSheet("color: #8a8a8a; font-style: italic;")
-        self.wordiness_desc.setWordWrap(True)
-        self.wordiness_desc.setContentsMargins(24, 0, 0, 0)
-        prefs_layout.addWidget(self.wordiness_desc)
+        grid.addWidget(self.wordiness_combo, 2, 1)
+        self.wordiness_desc = _desc_label(ignored=True)
+        grid.addWidget(self.wordiness_desc, 2, 2, 1, 2)
 
+        self.base_combo.currentTextChanged.connect(self._on_base_changed)
         self.tone_combo.currentTextChanged.connect(lambda _t: self.update_live_descriptions())
         self.wordiness_combo.currentTextChanged.connect(lambda _t: self.update_live_descriptions())
+        self._rebuild_base_combo()
         self._refresh_briefing_text()
 
     # ---------------------------------------------------------------- helpers
+    def _rebuild_base_combo(self):
+        """Fill the core combo with 'Default' + the user's base prompt variants,
+        selecting the active one. Re-run after the Manage dialog closes."""
+        active = self._presets.get(prompt_presets.BASE_ACTIVE_KEY, prompt_presets.ACTIVE_DEFAULT)
+        self.base_combo.blockSignals(True)
+        self.base_combo.clear()
+        self.base_combo.addItem(prompt_presets.ACTIVE_DEFAULT)
+        base_names = list(self._presets.get(prompt_presets.BASE_SECTION, {}))
+        if base_names:
+            self.base_combo.insertSeparator(self.base_combo.count())
+            self.base_combo.addItems(base_names)
+        self.base_combo.setCurrentText(active)
+        self.base_combo.blockSignals(False)
+        self._update_base_desc()
+
+    def _on_base_changed(self, name: str):
+        """Selection only - the pick commits to disk on Apply Changes, like
+        tone/verbiage. The combo's current text is the pending choice."""
+        self._update_base_desc()
+
+    def _update_base_desc(self):
+        name = self.base_combo.currentText()
+        entry = self._presets.get(prompt_presets.BASE_SECTION, {}).get(name, {})
+        desc = str(entry.get("description", "")).strip()
+        if not desc:
+            desc = "Built-in prompt." if name == prompt_presets.ACTIVE_DEFAULT else name
+        self.base_desc.setToolTip(desc)
+        self._schedule_elide()
+
     def _populate_combo(self, combo, section, builtin_names):
         """Fill a combo with built-ins, a separator, then this user's presets."""
         combo.blockSignals(True)
@@ -101,9 +149,14 @@ class ProfileTab(QWidget):
         combo.blockSignals(False)
 
     def _refresh_combos(self):
-        """Re-read user presets from disk and rebuild both combos, keeping
+        """Re-read user presets from disk and rebuild all combos, keeping
         the current selection when it still exists (else fall back to Standard)."""
         self._presets = prompt_presets.load_presets(self.window.project_root)
+        # A pending (unapplied) core pick survives the rebuild when it still exists.
+        pending_core = self.base_combo.currentText()
+        self._rebuild_base_combo()
+        if self.base_combo.findText(pending_core) >= 0:
+            self.base_combo.setCurrentText(pending_core)
         for combo, builtin, section in (
             (self.tone_combo, self.window.available_tones, "tones"),
             (self.wordiness_combo, self.window.available_wordiness, "wordiness"),
@@ -142,17 +195,21 @@ class ProfileTab(QWidget):
         self.briefing_label.setText(
             f"Greetings {current_name}!\n\n"
             "Welcome to your Dynamic Suit Voice diagnostic dashboard.\n\n"
-            "This management utility directly bridges your customized preferences with the local "
-            "voice synthesis pipeline. Adjusting settings on these tabs allows you to tailor your suit's "
-            "personality and acoustic metrics cleanly before (or during) deployment.\n\n"
+            "This management utility directly bridges your customized preferences with the local voice synthesis "
+            "pipeline. Adjusting settings on these tabs allows you to tailor your suit's personality and acoustic "
+            "metrics cleanly before (or during) deployment - the running engine picks up applied changes "
+            "automatically.\n\n"
             "QUICK-START FLIGHT MANUAL:\n"
-            "\u2022 User Profile: Assign your personalized iteration designation and choose your AI's narrative behaviors.\n"
+            "\u2022 User Profile: Assign your personalized iteration designation and choose your AI's narrative behaviors. "
+            "'Manage' opens the preset editor: custom tone/verbiage presets, the base prompt with its persona distiller, "
+            "and a combination test on a real in-game phrase.\n"
             "\u2022 Audio Modifiers: Fine-tune post-processing filters or test customized presets inside the live sandbox.\n"
-            "\u2022 Voice Model: Swap out baseline voice models or safely manage local hard drive storage footprints.\n"
-            "\u2022 System Environment: Configure game directory pathways or adjust background polling refresh scales.\n\n"
-            "Choose 'Cancel' to close without saving any further changes.\n"
-            "Choose 'Save & Close' to save choices to disk and exit the Manager.\n"
-            "Choose 'Apply Changes' at any time to save choices to disk while keeping your testing sandbox open."
+            "\u2022 Voice Model: Select your synthesis voice, or clone your own; first-time cloning setup lives here too.\n"
+            "\u2022 System Environment: Configure game directory pathways, run first-time Setup, adjust background polling "
+            "refresh scales, and watch the live pipeline log.\n\n"
+            "Choose 'Apply Changes' at any time to save choices to disk while keeping your testing sandbox open. "
+            "Closing the window hides it to the tray while the engine keeps running; the tray icon's Exit stops the "
+            "engine and quits."
         )
         self.update_live_descriptions()
 
@@ -165,4 +222,30 @@ class ProfileTab(QWidget):
             key = combo.currentText()
             entry = self.builtin_entry(section, key) or self._presets.get(section, {}).get(key, {})
             desc = entry.get("description", "") if isinstance(entry, dict) else ""
-            label.setText(f"\u21b3 Profile: {desc}")
+            label.setToolTip(desc)
+        self._schedule_elide()
+
+    def _elide_descs(self):
+        """Fit the one-line descriptions by pixel width. Row 1 stops short of
+        Manage; rows 2-3 span to the group edge and elide to their real width."""
+        if not self.manage_btn.isVisible():
+            return
+        fm = self.base_desc.fontMetrics()
+        left = self.base_desc.mapTo(self, self.base_desc.rect().topLeft()).x()
+        manage_left = self.manage_btn.mapTo(self, self.manage_btn.rect().topLeft()).x()
+        row_limit = max(60, manage_left - left - 12)
+        self.base_desc.setText(
+            fm.elidedText(self.base_desc.toolTip(), Qt.TextElideMode.ElideRight, row_limit))
+        for lbl in (self.tone_desc, self.wordiness_desc):
+            lbl.setText(fm.elidedText(lbl.toolTip(), Qt.TextElideMode.ElideRight, max(60, lbl.width() - 6)))
+
+    def _schedule_elide(self):
+        QTimer.singleShot(0, self._elide_descs)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._schedule_elide()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._schedule_elide()

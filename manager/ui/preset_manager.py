@@ -185,6 +185,10 @@ class PresetSectionEditor(QWidget):
         form.addWidget(self.name_edit)
         form.addWidget(QLabel("Description:"))
         self.desc_edit = QLineEdit()
+        self.desc_edit.setMaxLength(120)
+        self.desc_edit.setToolTip(
+            "One-line summary shown beside the dropdowns in the profile panel (max 120 characters)."
+        )
         form.addWidget(self.desc_edit)
         form.addWidget(QLabel("Prompt:"))
         self.prompt_edit = QPlainTextEdit()

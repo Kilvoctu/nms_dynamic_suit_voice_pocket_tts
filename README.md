@@ -9,6 +9,10 @@
 - Game path, voice, and other preferences stored in an untracked settings file that persists through updates.
 - Remove Wwise. Voice audio is packed into the game's format by a small standalone tool ([wav2wem](https://github.com/pas2k/wav2wem)).
 
+<p align="center">
+  <a href="preview.png"><img src="preview.png" width="700" alt="The DSV Manager: User Profile tab"></a>
+</p>
+
 Full guide: [docs/Guide.md](https://github.com/Kilvoctu/nms_dynamic_suit_voice_pocket_tts/blob/main/docs/Guide.md)
 
 *The original v1.1 readme below is kept for reference; details like installation steps and file paths are superseded by the fork list above.*

@@ -40,5 +40,4 @@ cache/sandbox_raw.wav
 cache/sandbox_processed.wav
 
 nms_dsv_manager.lock
-config/ui_state.json
 assets/gemma4_e2b/

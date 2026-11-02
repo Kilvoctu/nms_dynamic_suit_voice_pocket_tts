@@ -26,7 +26,7 @@ Repository: [nms_dynamic_suit_voice](https://github.com/Bob-Harper/nms_dynamic_s
 
 Open **`run_manager.cmd`** (the console flashes and dismisses itself). The manager starts the voice pipeline automatically and shows live status in the bottom bar. Once it reads **Ready**, start No Man's Sky. Play until your suit notifies you twice about the same thing; the second phrase will be different.
 
-Voice: **Voice Model** tab (8 built-ins plus clones, see below). Sound: **Audio Modifiers** tab, where the current sliders can be saved as your own named presets. Changes apply to the running engine automatically - no restart needed.
+Voice: **Voice Model** tab (8 built-ins plus clones, see below). Sound: **Audio Modifiers** tab, where the current sliders can be saved as your own named presets. Changes apply to the running engine automatically - no restart needed. After applying any change, the suit's lines are quietly re-recorded in the background.
 
 ## Prompt presets
 
@@ -38,17 +38,11 @@ Tone and verbiage presets live on the **User Profile** tab; built-ins can't be c
 
 ## Voice cloning
 
-Easiest: use the **Clone a Voice** panel in the manager's **Voice Model** tab (pick a name and a clean sample, press Clone Voice). To do it by hand instead:
+Use the **Clone a Voice** panel in the manager's **Voice Model** tab: type a name (spaces are fine and become underscores; `\ / : * ? " < > |` aren't allowed), pick a clean sample, press **Clone Voice**. The first clone downloads the cloning model once (online, from Hugging Face); after that, cloning and the voice engine itself stay fully local.
 
-1. Get a clean sample: one speaker, no music or background noise, 10-30 seconds.
-2. Export the voice state (create folders if they don't exist):
-   ```
-   venv\Scripts\pocket-tts.exe export-voice C:\path\to\sample.wav user\pocket_voices\myvoice\_model_states\english_2026-10.safetensors --language english_2026-10
-   ```
-3. The voice appears in the **Voice Model** tab - select it and press **Set as Active Voice**;
-   the running engine picks it up automatically.
+A clean sample means one speaker, no music or background noise, 10-30 seconds, as a `.wav` file. The voice appears in the **Voice Model** tab - select it and press **Set as Active Voice**; the running engine picks it up automatically. Clones stay local in `user/pocket_voices/`, and a voice state only loads for the pinned model (`english_2026-10`). Remove a clone via **Remove Voice**.
 
-Clones stay local in `user/pocket_voices/`. A voice state must be exported for the pinned model (`english_2026-10`); states for other model versions won't load. Remove a clone via **Remove Voice** in the Voice Model tab. If `export-voice` reports "voice cloning unsupported", log in once with `hf auth login` (free HuggingFace account, accept the model's terms) and retry.
+If cloning reports "voice cloning unsupported", press **Sign in & Preload Model** in the Voice Model tab: it opens a Hugging Face sign-in window (paste an access token from huggingface.co - free account, create one under Settings → Access Tokens and accept the model's terms there) and then downloads the cloning model. The sign-in is remembered on your PC, so press **Clone Voice** again and it works from then on.
 
 ## Shutting it down
 

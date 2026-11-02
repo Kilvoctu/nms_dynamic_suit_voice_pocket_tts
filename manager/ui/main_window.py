@@ -131,8 +131,8 @@ class MainWindow(QMainWindow):
         self.pipeline_bar.add_tail(apply_btn)
 
         self.setCentralWidget(central)
-        self.resize(1150, 760)
-        self.setMinimumSize(860, 560)
+        self.resize(860, 640)
+        self.setMinimumSize(860, 640)
         self._load_window_state()
 
         # Win11 rounded corners
@@ -227,6 +227,12 @@ class MainWindow(QMainWindow):
                 "tone": profile_tab.tone_combo.currentText(),
                 "wordiness": profile_tab.wordiness_combo.currentText(),
             }
+            from modular import prompt_presets
+
+            presets = prompt_presets.load_presets(self.project_root)
+            presets[prompt_presets.BASE_ACTIVE_KEY] = (
+                profile_tab.base_combo.currentText() or prompt_presets.ACTIVE_DEFAULT)
+            prompt_presets.save_presets(self.project_root, presets)
         if audio_tab is not None:
             fx = updated.get("voice_effects", {})
             fx.update(audio_tab._slider_values())
@@ -274,7 +280,15 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------- window state memory
     def _ui_state_file(self) -> Path:
-        return self.project_root / "config" / "ui_state.json"
+        """Window state lives with the rest of the user's untracked settings."""
+        new = self.project_root / "user" / "ui_state.json"
+        old = self.project_root / "config" / "ui_state.json"
+        if not new.exists() and old.exists():
+            try:  # one-time migration of pre-existing geometry/last_dirs
+                old.replace(new)
+            except Exception:
+                return old
+        return new
 
     def _load_window_state(self):
         """Restore the window size/position (and maximized state); default size on first run."""

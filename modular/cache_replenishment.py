@@ -7,9 +7,8 @@ from modular.tts_utils import run_tts
 from modular.wem_utils import convert_to_wem
 
 
-def generate_replacement_voice_line(config, wem_id, output_path: Path, rephrase: bool = True):
-    """Generate one WEM variant; rephrase=False speaks the original transcription (background refresh path)."""
-
+def rephrase_replacement_line(config, wem_id, rephrase: bool = True) -> str:
+    """Stage 1: build the suit prompt and reword it with the local LLM (CPU-bound)."""
     if wem_id not in config.intent_map:
         print(f"[cache_replacement.py] No intent entry for WEM ID {wem_id}")
         return None
@@ -29,7 +28,11 @@ def generate_replacement_voice_line(config, wem_id, output_path: Path, rephrase:
         llm_seconds = 0.0
 
     print(f'[Gen] {wem_id}: "{original_phrase}" -> "{reworded}" (llm {llm_seconds:.1f}s)')
+    return reworded
 
+
+def render_replacement_line(config, wem_id, output_path: Path, reworded: str) -> Path:
+    """Stage 2: render the reworded line through TTS + DSP and encode to WEM (TTS-bound)."""
     stage_start = time.monotonic()
     temp_wav_path = run_tts(config, reworded, wem_id)
     render_seconds = time.monotonic() - stage_start
@@ -54,3 +57,11 @@ def generate_replacement_voice_line(config, wem_id, output_path: Path, rephrase:
     encode_seconds = time.monotonic() - stage_start
     print(f"[Gen] {wem_id}: wem ready (render {render_seconds:.1f}s, encode {encode_seconds:.1f}s) -> {final_wem_path.name}")
     return final_wem_path
+
+
+def generate_replacement_voice_line(config, wem_id, output_path: Path, rephrase: bool = True):
+    """Sequential convenience path: both stages back to back (used outside the queue)."""
+    reworded = rephrase_replacement_line(config, wem_id, rephrase=rephrase)
+    if reworded is None:
+        return None
+    return render_replacement_line(config, wem_id, output_path, reworded)

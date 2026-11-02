@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
 
         if self.setup_pending:
             banner = QLabel(
-                "Setup required - open the System Environment tab, enter your No Man's Sky mod directory and press Setup."
+                "Setup required - in System Environment tab, enter your No Man's Sky mod directory and press Setup."
             )
             banner.setStyleSheet("color: #FBBF24; font-weight: bold; padding: 8px;")
             banner.setWordWrap(True)

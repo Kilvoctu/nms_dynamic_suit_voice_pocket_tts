@@ -315,10 +315,8 @@ def _measure_loudness(ffmpeg_bin: str, wav_path: Path, create_no_window: int, pr
 def apply_loudness_normalization(ffmpeg_bin: str, wav_path: Path, loudness_target: float,
                                  create_no_window: int = 0, true_peak: float = 5.0,
                                  initial_stats=None, pre_chain: str = "") -> bool:
-    """Gain toward the loudness target with a true-peak limiter cap; iterates
-    until the target holds (limiting steals loudness, so it re-measures).
-    initial_stats: pre-measured stats for the audio pre_chain transforms, saving
-    one analysis spawn; pre_chain rides the first apply pass (creative filters)."""
+    """Gain toward the loudness target with a true-peak limiter cap; iterates until it holds.
+    initial_stats/pre_chain ride the first apply pass, saving a separate analysis spawn."""
     create_no_window = create_no_window or (0x08000000 if sys.platform == "win32" else 0)
     stats = initial_stats
     if stats is not None:
@@ -337,11 +335,8 @@ def apply_loudness_normalization(ffmpeg_bin: str, wav_path: Path, loudness_targe
                 measured_i = float(stats["input_i"])
             except (KeyError, TypeError, ValueError):
                 return False
-            # Iterate: gain toward the target (+0.9 compensation pre-empts wav2wem's
-            # oggenc2 LUFS loss), then a lookahead limiter caps true peaks at the ceiling.
-            # Limiting steals some loudness, so measure again and correct, up to 5 passes.
-            # alimiter's limit tops out at 1.0, so the signal is scaled down by the
-            # ceiling before it and restored after.
+            # Iterate: gain toward the target (+0.9 compensation pre-empts wav2wem's LUFS loss), then a
+            # lookahead limiter caps true peaks; limiting steals loudness, so re-measure (max 5 passes).
             gain_db = loudness_target - measured_i + WEM_ENCODER_COMPENSATION_DB
             if abs(gain_db) <= 0.4 and not pre_chain:
                 return True
@@ -429,10 +424,8 @@ def apply_vocal_dsp_chain(input_wav: Path, output_wav: Path,
         wf.setframerate(sr)
         wf.writeframes(audio_bytes)
 
-    # 3. One ffmpeg pass: the creative chain (volume/tempo/rate) rides into the
-    #    first loudnorm apply instead of its own spawn; loudness is measured with
-    #    the chain pre-applied so the linear gain math stays exact. The apply's
-    #    -ar 22050 locks the game-engine sample rate (replaces the old resample).
+    # 3. One ffmpeg pass: the creative chain (volume/tempo/rate) rides into the first loudnorm
+    #    apply; loudness is measured with the chain pre-applied so the linear gain math stays exact.
     CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
     setrate_val = int(44100 * rate)
     ffmpeg_bin = _resolve_ffmpeg()

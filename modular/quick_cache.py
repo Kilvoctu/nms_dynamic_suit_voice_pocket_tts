@@ -2,6 +2,7 @@ from time import time, sleep
 import hashlib
 import itertools
 import json
+import os
 import shutil
 import threading
 import traceback
@@ -9,10 +10,8 @@ from queue import PriorityQueue
 from pathlib import Path
 from modular.cache_replenishment import rephrase_replacement_line, render_replacement_line
 
-# Priority queues: stage 1 rephrases with the LLM, stage 2 renders TTS+WEM —
-# the stages run on separate workers so LLM and TTS overlap. Tiers: 0 = lines
-# the player waits on, 10 = the voice-file sweep, 20 = restock core, 30 = filler
-# rounds (held until the sweep wave finishes, then one pass per depth level).
+# Priority queues: stage 1 rephrases with the LLM, stage 2 renders TTS+WEM, on separate workers.
+# Tiers: 0 = lines the player waits on, 10 = the voice-file sweep, 20 = restock core, 30 = filler.
 _rephrase_queue = PriorityQueue()
 _render_queue = PriorityQueue()
 _job_seq = itertools.count()
@@ -28,12 +27,14 @@ _active_jobs_count = {}
 _gameplay_pending = {}
 _jobs_lock = threading.Lock()
 
-# Wave discipline: while a sweep is mid-pass, filler stays queued nowhere (it is
-# re-derived at wave end); filler rounds run one depth level at a time, in line
-# order, chained off the completion of the previous round.
+# Wave discipline: filler rounds wait until no sweep wave is mid-pass, then grow depth
+# one level at a time in line order, each round chained off the previous round's completion.
 _sweep_wave_depth = 0
 _filler_round_pending = 0
 _restock_config = None
+_queue_status_config = None  # most recent config seen, for queue-depth publishing
+_last_published_pending = -1
+_publish_lock = threading.Lock()  # serialize sidecar writes so they can't go stale
 
 
 def _settings_fingerprint(config) -> str:
@@ -80,6 +81,38 @@ def record_mod_manifest(config, wem_id) -> None:
     }
     save_mod_manifest(config, manifest)
 
+def pending_job_count() -> int:
+    """Total background jobs currently queued or rendering, across all tiers."""
+    with _jobs_lock:
+        return sum(_active_jobs_count.values())
+
+def _publish_queue_depth(config=None):
+    """Mirror the pending job count to cache/pipeline_queue.json (manager status bar).
+    Count is read under the publish lock so concurrent writes can't go stale. Non-fatal."""
+    global _queue_status_config, _restock_config, _last_published_pending
+    if config is not None:
+        _queue_status_config = config
+        _restock_config = config
+    cfg = config or _queue_status_config
+    if cfg is None:
+        return
+    with _publish_lock:
+        total = pending_job_count()
+        if total == _last_published_pending:
+            return
+        _last_published_pending = total
+        path = _manifest_path(cfg).parent / "pipeline_queue.json"
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(
+                json.dumps({"pending": total, "pid": os.getpid(), "updated": time()}),
+                encoding="utf-8",
+            )
+            tmp.replace(path)
+        except OSError:
+            pass
+
 def enqueue_job(func, *args, priority=10, **kwargs):
     """Add a job to the rephrase stage and track its allocation. Tiers: 0 = gameplay
     lines the player waits on, 10 = the voice-file sweep, 20 = restock core, 30 = filler."""
@@ -94,6 +127,7 @@ def enqueue_job(func, *args, priority=10, **kwargs):
             _active_jobs_count[wem_id] = _active_jobs_count.get(wem_id, 0) + 1
             if priority == 0:
                 _gameplay_pending[wem_id] = _gameplay_pending.get(wem_id, 0) + 1
+        _publish_queue_depth(args[0] if args else None)
 
     _rephrase_queue.put((priority, next(_job_seq), (func, args, kwargs)))
 
@@ -112,6 +146,7 @@ def _decrement_job(wem_id: str, priority: int):
             chain_round = _filler_round_pending == 0
     if chain_round:
         _maybe_start_filler_round()
+    _publish_queue_depth()
 
 
 def _llm_worker_loop():
@@ -245,9 +280,8 @@ def end_sweep_wave():
     _maybe_start_filler_round()
 
 def _maybe_start_filler_round():
-    """One filler round ('1c..35c'): a single extra variant for every tracked
-    line still under cache depth, enqueued in line order. Chained rounds grow
-    depth one level at a time once no sweep wave holds them back."""
+    """One filler round ('1c..35c'): a single extra variant per tracked line under
+    cache depth, enqueued in line order; chained rounds grow depth one level at a time."""
     global _filler_round_pending, _restock_config
     config = _restock_config
     if config is None:
@@ -283,9 +317,8 @@ def _maybe_start_filler_round():
 
 
 def _enqueue_restock(config, wem_id, wem_dir, rephrase, inventory):
-    """Restock at serve time: the first _RESTOCK_CORE variants render at restock
-    priority immediately (top-up-at-source). Deeper filler is not enqueued here
-    at all - it runs in ordered rounds once the current sweep wave completes."""
+    """Serve-time top-up: first _RESTOCK_CORE variants at restock priority now;
+    deeper filler is never enqueued here (it runs in rounds after the sweep wave)."""
     global _restock_config
     _restock_config = config
     max_depth = max(0, int(getattr(config, "quick_cache_max", 16) or 0))
@@ -300,8 +333,7 @@ def _enqueue_restock(config, wem_id, wem_dir, rephrase, inventory):
 
 def get_cached_wem(config, wem_id, top_up=True, rephrase=True, priority=0):
     """Serve a voice-tagged cache variant, generating one on demand (single-use;
-    stale-voice eras purged on sight). The caller's priority tier applies to the
-    on-demand fallback render (watcher = 0, sweep = 10); restock core is 20, filler 30."""
+    stale eras purged on sight). Caller priority: watcher 0, sweep 10, core 20, filler 30."""
     wem_dir = config.quick_cache_dir / str(wem_id)
     wem_dir.mkdir(parents=True, exist_ok=True)
 

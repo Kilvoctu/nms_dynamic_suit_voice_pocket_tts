@@ -695,15 +695,19 @@ class BasePromptEditor(PresetSectionEditor):
     """Base prompt variants: the built-in Default (read-only) plus user rewrites,
     with an Activate control - the active variant shapes every generated line."""
 
-    def __init__(self, project_root, presets, llm_host=None, window=None, parent=None):
+    def __init__(self, project_root, presets, llm_host=None, window=None, on_core_pending=None, parent=None):
         self._llm_host = llm_host  # CombinationTestTab: shares its lazy-loaded LLM
         self.window = window  # main window for last-folder persistence (may be None)
+        self._on_core_pending = on_core_pending  # main-window combo pending pick (may be None)
         self._distill_thread = None
         self._distill_path = None
         self._builtin_text = self._read_builtin_text(project_root)
         super().__init__(project_root, prompt_presets.BASE_SECTION, presets, parent=parent)
         self.activate_btn = QPushButton("Activate")
-        self.activate_btn.setToolTip("Use this base prompt variant for all generated lines.")
+        self.activate_btn.setToolTip(
+            "Select this core prompt variant for all generated lines.\n"
+            "Takes effect when you press Apply Changes in the main window."
+        )
         self.activate_btn.clicked.connect(self._on_activate)
         self._btn_row.insertWidget(0, self.activate_btn)
         self.distill_btn = QPushButton("Distill Chat Persona...")
@@ -716,9 +720,9 @@ class BasePromptEditor(PresetSectionEditor):
         self._refresh_from_selection()
 
     def _header_widget(self):
-        """Amber warning: the base prompt shapes every line the suit speaks."""
+        """Amber warning: the core prompt shapes every line the suit speaks."""
         warn = QLabel(
-            "WARNING: The base prompt defines the suit's core behavior and shapes EVERY line it speaks. "
+            "WARNING: The core prompt defines the suit's core behavior and shapes EVERY line it speaks. "
             "Changes here have a much larger effect than tone or verbiage presets."
         )
         warn.setStyleSheet("color: #FBBF24; font-style: italic;")
@@ -734,8 +738,8 @@ class BasePromptEditor(PresetSectionEditor):
             return ""
 
     def _load_builtin(self) -> dict:
-        """Single built-in entry: the Default base prompt."""
-        return {"Default": {"text": self._builtin_text, "description": "Original built-in base prompt."}}
+        """Single built-in entry: the Default core prompt."""
+        return {"Default": {"text": self._builtin_text, "description": "Original built-in core prompt."}}
 
     def _is_active(self, name: str) -> bool:
         """True when this name is the currently active base variant."""
@@ -781,7 +785,7 @@ class BasePromptEditor(PresetSectionEditor):
         self.delete_btn.setEnabled(self._is_user(name))
         self.dup_btn.setEnabled(bool(name))
         if builtin_mode:
-            self.hint_label.setText("Built-in base prompt - duplicate to customize.")
+            self.hint_label.setText("Built-in core prompt - duplicate to customize.")
             self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
         else:
             self.hint_label.setText("")
@@ -792,7 +796,7 @@ class BasePromptEditor(PresetSectionEditor):
         """Validation message for a candidate base variant name."""
         error = super()._unique_name_error(name)
         if not error and name == prompt_presets.ACTIVE_DEFAULT:
-            error = "'Default' is reserved for the built-in base prompt."
+            error = "'Default' is reserved for the built-in core prompt."
         return error
 
     def _on_save(self):
@@ -826,18 +830,25 @@ class BasePromptEditor(PresetSectionEditor):
         """Reset to the built-in Default when the active variant is removed."""
         if self.presets.get(prompt_presets.BASE_ACTIVE_KEY) == name:
             self.presets[prompt_presets.BASE_ACTIVE_KEY] = prompt_presets.ACTIVE_DEFAULT
+            if self._on_core_pending is not None:
+                self._on_core_pending(prompt_presets.ACTIVE_DEFAULT)
 
     def _on_activate(self):
-        """Make the selected entry (built-in or user variant) the active base prompt."""
+        """Mark the selected entry as the pending core prompt: updates the main
+        window's combo only - Apply Changes commits it, so no auto-refresh."""
         name = self._selected_name()
         if not name:
             return
         self.presets[prompt_presets.BASE_ACTIVE_KEY] = (
             prompt_presets.ACTIVE_DEFAULT if self._selected_is_builtin() else name
         )
-        prompt_presets.save_presets(self.project_root, self.presets)
         self._reload_list(select=None if self._selected_is_builtin() else name)
-        self.hint_label.setText(f"Active base prompt: {self.presets[prompt_presets.BASE_ACTIVE_KEY]}.")
+        if self._on_core_pending is not None:
+            self._on_core_pending(self.presets[prompt_presets.BASE_ACTIVE_KEY])
+        self.hint_label.setText(
+            f"Core prompt set to {self.presets[prompt_presets.BASE_ACTIVE_KEY]} - "
+            "takes effect when you press Apply Changes."
+        )
         self.hint_label.setStyleSheet("color: #4ADE80; font-style: italic;")
 
     # ------------------------------------------------------------- distill
@@ -899,9 +910,8 @@ class BasePromptEditor(PresetSectionEditor):
         return text, path.stem
 
     def _distill_job(self, persona_text: str) -> str:
-        """Worker body: lazy-load the shared LLM and rewrite the persona,
-        streaming progress and a live preview, regenerating until the draft
-        meets the required format (the app validates, the model writes)."""
+        """Worker body: lazy-load the shared LLM and rewrite the persona, streaming
+        progress and a live preview, regenerating until the draft meets the format."""
         import time
 
         config = self._llm_host._config_shim()
@@ -1035,7 +1045,7 @@ class BasePromptEditor(PresetSectionEditor):
 class PresetManagerDialog(QDialog):
     """Unified dialog: tone presets, verbiage presets, base prompt and the test."""
 
-    def __init__(self, project_root, tone="", wordiness="", parent=None):
+    def __init__(self, project_root, tone="", wordiness="", on_core_pending=None, parent=None):
         super().__init__(parent)
         self.project_root = Path(project_root)
         self.manager_window = parent  # main window: last-folder persistence helpers
@@ -1048,10 +1058,11 @@ class PresetManagerDialog(QDialog):
         self.tone_editor = PresetSectionEditor(self.project_root, "tones", self.presets, tone)
         self.wordiness_editor = PresetSectionEditor(self.project_root, "wordiness", self.presets, wordiness)
         self.base_editor = BasePromptEditor(
-            self.project_root, self.presets, llm_host=self.test_tab, window=self.manager_window)
+            self.project_root, self.presets, llm_host=self.test_tab, window=self.manager_window,
+            on_core_pending=on_core_pending)
         tabs.addTab(self.tone_editor, "Tone Presets")
         tabs.addTab(self.wordiness_editor, "Verbiage Presets")
-        tabs.addTab(self.base_editor, "Base Prompt")
+        tabs.addTab(self.base_editor, "Core Prompt")
         tabs.addTab(self.test_tab, "Combination Test")
         tabs.currentChanged.connect(self._on_tab_changed)
 

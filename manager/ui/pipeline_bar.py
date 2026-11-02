@@ -1,9 +1,12 @@
 # manager/ui/pipeline_bar.py - always-visible bottom strip: live pipeline status
 # + Start/Stop, present on every tab. Owns the pipeline subprocess it launched.
+import json
 import os
 import subprocess
 import sys
 import time
+
+from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton
@@ -60,7 +63,7 @@ class PipelineBar(QFrame):
         layout.addWidget(self.start_btn)
 
         self.stop_btn = QPushButton("Stop")
-        self.stop_btn.clicked.connect(self._pipeline_stop)
+        self.stop_btn.clicked.connect(lambda: self._pipeline_stop())
         self.stop_btn.setToolTip(_STOP_TIP)
         layout.addWidget(self.stop_btn)
 
@@ -120,6 +123,19 @@ class PipelineBar(QFrame):
         super().resizeEvent(event)
         self._render_status_text()
 
+    def _read_generation_queue(self, status: dict) -> int:
+        """Pending background generation count published by the engine's cache
+        (cache/pipeline_queue.json). A sidecar from a previous engine process
+        (pid mismatch) reads as 0 so stale files can't fake live activity."""
+        try:
+            path = Path(self.window.project_root) / "cache" / "pipeline_queue.json"
+            entry = json.loads(path.read_text(encoding="utf-8"))
+            if int(entry.get("pid", -1)) != int(status.get("pid", -2)):
+                return 0
+            return max(0, int(entry.get("pending", 0)))
+        except Exception:
+            return 0
+
     def _refresh(self):
         if self._flash_text is not None:
             if time.monotonic() < self._flash_until:
@@ -149,9 +165,19 @@ class PipelineBar(QFrame):
                     self._stop_deadline = time.time() + 5  # re-arm; verify death
                 self._set_state("Status: Stopping...", "#FBBF24", False, False, "Stopping...")
             else:
+                queued = self._read_generation_queue(status)
+                if queued > 0:
+                    # The engine is synthesizing in the background - say so
+                    # instead of a frozen "Ready" (amber = activity).
+                    base = (f"Generating {queued} queued variant(s)" if not detail
+                            else f"{detail} - {queued} queued")
+                    color = "#FBBF24"
+                else:
+                    base = detail or "listening for game lines"
+                    color = "#4ADE80"
                 self._set_state(
-                    f"Status: Running - {detail or 'listening for game lines'}",
-                    "#4ADE80", False, True, f"Running ({detail or 'ready'})",
+                    f"Status: Running - {base}",
+                    color, False, True, f"Running ({detail or 'ready'})",
                 )
         else:
             self._stop_deadline = None

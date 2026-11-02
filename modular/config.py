@@ -130,9 +130,8 @@ class SuitVoiceConfig:
         # Structured descriptions for the manager UI
         self.ui_promptdata = raw_prompt_json
 
-        # Flatten the dictionary dynamically in memory for the backend AI engine!
-        # This keeps the rest of your text generation loops 100% stable and untouched.
-        # Tones/wordiness flatten to prompt strings; per-category context stays intact.
+        # Flatten the dictionary dynamically in memory for the backend AI engine! Tones/wordiness
+        # flatten to prompt strings; per-category context stays intact; generation loops untouched.
         self.promptdata = build_promptdata(raw_prompt_json)
 
         # Apply the user's active base prompt variant (Default = the built-in file).

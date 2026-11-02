@@ -243,5 +243,12 @@
         "Category": "Toxic Hazard",
         "Intent": "Toxic shielding is weakening; omminent direct exposure to ambient poisons.",
         "Used": "Yes"
+    },
+    "396681446": {
+        "Filename": "396681446.wem",
+        "Transcription": "Nearby toxins detected",
+        "Category": "Toxic Hazard",
+        "Intent": "Hazardous toxins are damaging {name}'s suit filters.",
+        "Used": "Yes"
     }
 }

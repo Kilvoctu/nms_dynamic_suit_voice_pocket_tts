@@ -6,8 +6,9 @@ import socket
 try:
     _instance_lock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     _instance_lock.bind(("127.0.0.1", 49152))
+    _instance_lock.listen(1)  # bind alone doesn't hold the port on Windows
 except socket.error:
-    sys.exit(0)
+    os._exit(0)  # sys.exit can hang in pythonw; hard-exit keeps zombies away
 
 import threading
 import time

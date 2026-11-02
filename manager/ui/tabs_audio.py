@@ -184,7 +184,7 @@ class AudioTab(QWidget):
         self.test_text.setMaximumHeight(80)
         sandbox_layout.addWidget(self.test_text)
 
-        self.generate_btn = QPushButton("Apply Effects & Play Audio")
+        self.generate_btn = QPushButton("Apply Effects && Play Audio")
         self.generate_btn.clicked.connect(self._run_async_audio_test)
         sandbox_layout.addWidget(self.generate_btn)
 

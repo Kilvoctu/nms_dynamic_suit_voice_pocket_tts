@@ -7,6 +7,22 @@ from modular.quick_cache import (begin_sweep_wave, end_sweep_wave, get_cached_we
 from PIL import Image
 # NOTE: No global config or TTS instantiations live at the top of this file anymore!
 
+def _scan_atimes(directory):
+    """True per-file stats: scandir's enumerated atime lags minutes behind on NTFS
+    (System-Managed LastAccess updates the MFT but not the directory index)."""
+    found = {}
+    try:
+        with os.scandir(directory) as it:
+            for entry in it:
+                if entry.name.endswith(".wem"):
+                    try:
+                        found[entry.name[:-4]] = os.stat(entry.path).st_atime
+                    except OSError:
+                        pass
+    except OSError:
+        pass  # transient (folder busy): skip this pass, the next one catches up
+    return found
+
 def watch_wems(wtray_ui, config):
     """Main watchdog thread invoked after the launcher completes fast boot."""
 
@@ -28,7 +44,7 @@ def watch_wems(wtray_ui, config):
         wtray_ui.icon.title = "Dynamic Suit Voice - Error: Missing Dirs"
         return
 
-    access_times = {f3.stem: f3.stat().st_atime for f3 in mod_dir.glob("*.wem")}
+    access_times = _scan_atimes(mod_dir)
 
     # Cache janitor: untracked dirs, stale-era variants and old temps, in the
     # background so it never delays the boot.
@@ -36,10 +52,8 @@ def watch_wems(wtray_ui, config):
     from modular.quick_cache import janitor_pass
     threading.Thread(target=janitor_pass, args=(config,), daemon=True, name="cache-janitor").start()
 
-    # Non-blocking watch: the scanner only detects plays and hands each fire to
-    # the serve thread, so a slow render never delays detecting the next play.
-    # Same-wem fires are coalesced while a serve is in flight - the fresh line
-    # that lands covers the next play of that line anyway.
+    # Non-blocking watch: the scanner only detects plays and hands each fire to the serve
+    # thread (same-wem fires coalesced), so a slow render never delays detecting the next play.
     import threading
     import queue as _queue
 
@@ -48,10 +62,30 @@ def watch_wems(wtray_ui, config):
     _fire_queue = _queue.Queue()
     _access = access_times  # shared, always touch under _watch_lock
 
+    # CSV transcriptions for logging untracked plays (the intent map may not know the line).
+    _csv_transcripts = {}
+    try:
+        import csv as _csv
+        with open(config.transcripts_path.with_suffix(".csv"), newline="", encoding="utf-8") as _fh:
+            _csv_transcripts = {r["WEM_number"]: r["Transcription"] for r in _csv.DictReader(_fh)
+                                if r.get("WEM_number")}
+    except Exception:
+        pass  # logging-only convenience
+
     def _serve_worker():
         while True:
             wem_id, fire_dir = _fire_queue.get()
             try:
+                if wem_id not in config.intent_map:
+                    spoken = str(_csv_transcripts.get(wem_id, "")).strip()
+                    spoken_part = f' - "{spoken}"' if spoken else ""
+                    print(f"[Watch] Untracked line played: {wem_id}{spoken_part} - "
+                          f"add it to the transcript map to get it revoiced.")
+                    with _watch_lock:  # absorb the play's new atime so the scanner doesn't refire
+                        stale_file = fire_dir / f"{wem_id}.wem"
+                        if stale_file.exists():
+                            _access[wem_id] = stale_file.stat().st_atime
+                    continue
                 spoken = str(config.intent_map.get(wem_id, {}).get("Transcription", "")).strip()
                 spoken_part = f' - speaking: "{spoken}"' if spoken else ""
                 print(f"[Watch] {wem_id} fired{spoken_part} - fetching a fresh line...")
@@ -81,10 +115,8 @@ def watch_wems(wtray_ui, config):
     threading.Thread(target=_serve_worker, daemon=True, name="watch-serve-1").start()
     threading.Thread(target=_serve_worker, daemon=True, name="watch-serve-2").start()
 
-    # --- PHASE 3.5: Mod folder voice-file refresh (manifest-gated) ---------------
-    # The manifest records each file's voice/settings era; only other-era lines re-record.
-    # A settings change mid-sweep bumps the generation: the running sweep aborts at
-    # its next file and a fresh sweep restarts, so no mixed-era files survive.
+    # --- PHASE 3.5: Mod folder refresh (manifest-gated; only other-era lines re-record).
+    # Mid-sweep settings changes bump the generation: the running sweep aborts and restarts.
     _refresh_lock = threading.Lock()
     _refresh_generation = [0]
 
@@ -162,7 +194,7 @@ def watch_wems(wtray_ui, config):
     current_mod_dir = config.mod_dir
 
     while wtray_ui.running:
-        # Live settings: manager Apply Changes (or hand edits) land within one watch interval, no engine restart required.
+        # Live settings: manager Apply (or hand edits) land within one watch interval, no restart needed.
         mtime = config.settings_mtime()
         if mtime != last_settings_mtime:
             last_settings_mtime = mtime
@@ -180,25 +212,20 @@ def watch_wems(wtray_ui, config):
             if current_mod_dir and current_mod_dir.exists():
                 with _watch_lock:
                     _access.clear()
-                    _access.update({f3.stem: f3.stat().st_atime for f3 in current_mod_dir.glob("*.wem")})
+                    _access.update(_scan_atimes(current_mod_dir))
         if not current_mod_dir or not current_mod_dir.exists():
             time.sleep(config.check_interval)
             continue
 
-        for f3 in current_mod_dir.glob("*.wem"):
-            try:
-                current_atime = f3.stat().st_atime
-                wem_id = f3.stem
-                with _watch_lock:
-                    changed = current_atime != _access.get(wem_id, 0)
-                    if changed and wem_id not in _in_flight:
-                        _in_flight.add(wem_id)  # coalesce: one serve per line at a time
-                        dispatch = True
-                    else:
-                        dispatch = False
-                if dispatch:
-                    _fire_queue.put((wem_id, current_mod_dir))
-            except Exception as w_e:
-                print(f"Error handling {f3.name}: {w_e}")
+        for wem_id, fresh_atime in _scan_atimes(current_mod_dir).items():
+            with _watch_lock:
+                changed = fresh_atime != _access.get(wem_id, 0)
+                if changed and wem_id not in _in_flight:
+                    _in_flight.add(wem_id)  # coalesce: one serve per line at a time
+                    dispatch = True
+                else:
+                    dispatch = False
+            if dispatch:
+                _fire_queue.put((wem_id, current_mod_dir))
 
         time.sleep(config.check_interval)

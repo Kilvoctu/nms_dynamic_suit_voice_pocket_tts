@@ -71,7 +71,7 @@ class ProfileTab(QWidget):
         self.base_combo = QComboBox()
         self.base_combo.setFixedWidth(220)
         self.base_combo.setToolTip(
-            "The core instruction block shaping the AI's personality - 'Default' is the\n"
+            "The core prompt shaping the AI's personality - 'Default' is the\n"
             "built-in prompt; other entries are your custom variants (Manage to edit).\n"
             "Switching takes effect when you press Apply Changes."
         )
@@ -175,10 +175,15 @@ class ProfileTab(QWidget):
             self.window.project_root,
             tone=self.tone_combo.currentText(),
             wordiness=self.wordiness_combo.currentText(),
+            on_core_pending=self._apply_pending_core,
             parent=self.window,
         )
         if dlg.exec():
             self._refresh_combos()
+
+    def _apply_pending_core(self, name: str):
+        """Manage dialog's Activate: update the pending combo pick (no disk write)."""
+        self.base_combo.setCurrentText(name or prompt_presets.ACTIVE_DEFAULT)
 
     def builtin_entry(self, section, key):
         """Return a built-in {prompt, description} entry from prompt_data.json ({} if absent)."""
@@ -201,7 +206,7 @@ class ProfileTab(QWidget):
             "automatically.\n\n"
             "QUICK-START FLIGHT MANUAL:\n"
             "\u2022 User Profile: Assign your personalized iteration designation and choose your AI's narrative behaviors. "
-            "'Manage' opens the preset editor: custom tone/verbiage presets, the base prompt with its persona distiller, "
+            "'Manage' opens the preset editor: custom tone/verbiage presets, the core prompt with its persona distiller, "
             "and a combination test on a real in-game phrase.\n"
             "\u2022 Audio Modifiers: Fine-tune post-processing filters or test customized presets inside the live sandbox.\n"
             "\u2022 Voice Model: Select your synthesis voice, or clone your own; first-time cloning setup lives here too.\n"

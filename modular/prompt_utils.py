@@ -1,6 +1,21 @@
 import random
 
 
+def build_promptdata(raw_prompt_json):
+    """Flatten prompt_data.json for the engine: tones/wordiness become {name:
+    prompt string}, while per-category context entries are preserved verbatim."""
+    promptdata = {}
+    for key, val in raw_prompt_json.items():
+        if key in ("tones", "wordiness"):
+            promptdata[key] = {
+                name: (entry["prompt"] if isinstance(entry, dict) else entry)
+                for name, entry in (val or {}).items()
+            }
+        else:
+            promptdata[key] = val["prompt"] if isinstance(val, dict) else val
+    return promptdata
+
+
 def build_suit_prompt(config, category, intent, phrase, wem_id):
     if category in config.mil_cat:  # requires special prompting for best results
         system_prompt = construct_milcat_prompt(config, category, intent, phrase, wem_id)
@@ -15,8 +30,9 @@ def build_suit_prompt(config, category, intent, phrase, wem_id):
     return system_prompt
 
 def construct_standard_prompt(config, category, intent, phrase, wem_id):
-    # Retrieve prompt components
-    system_prompt = config.suit_voice_base
+    # Retrieve prompt components. The base text is joined with a normalized
+    # blank-line seam so custom base prompts always combine cleanly.
+    system_prompt = config.suit_voice_base.rstrip() + "\n\n"
     tone = determine_tone(config)
     wordiness_level = determine_wordiness(config)
     category_context = config.promptdata.get(category, config.promptdata.get("Standard", ""))
@@ -37,7 +53,6 @@ def construct_standard_prompt(config, category, intent, phrase, wem_id):
     )
 
     system_prompt = system_prompt.format(name=config.player_name.strip())
-    system_prompt += " /nothink"
     return system_prompt
 
 def construct_milcat_prompt(config, category, intent, phrase, wem_id):
@@ -52,9 +67,6 @@ def construct_milcat_prompt(config, category, intent, phrase, wem_id):
         recent_lines = recent_lines.strip(),
     )
 
-    # Append reasoning mode toggle only if non-milcat logic wants it off
-    if getattr(config, "milcat_enable_reasoning", "False") == "False":
-        system_prompt += " /nothink"
 
     return system_prompt
 
@@ -62,6 +74,10 @@ def construct_milcat_prompt(config, category, intent, phrase, wem_id):
 def determine_tone(config):
     tones = list(config.promptdata.get("tones", {}).keys())
     current_tone = config.current_tone
+
+    # Test harnesses lock the selection to preview the exact chosen combination
+    if getattr(config, "selection_locked", False):
+        return current_tone
 
     # 90% chance stick with default
     if random.random() < 0.9 or not tones:
@@ -73,6 +89,10 @@ def determine_tone(config):
 
 def determine_wordiness(config):
     current = config.current_wordiness
+
+    # Test harnesses lock the selection to preview the exact chosen combination
+    if getattr(config, "selection_locked", False):
+        return current
 
     # If observer is explicitly set, never override it
     if current == "Observer":

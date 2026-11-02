@@ -5,8 +5,6 @@
   },
 
   "combat": {
-    "allow_reasoning": true,
-
     "special_categories": [
       "Missile Launch",
       "Missile Destroyed",

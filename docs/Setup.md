@@ -28,6 +28,14 @@ Open **`run_manager.cmd`** (the console flashes and dismisses itself). The manag
 
 Voice: **Voice Model** tab (8 built-ins plus clones, see below). Sound: **Audio Modifiers** tab, where the current sliders can be saved as your own named presets. Changes apply to the running engine automatically - no restart needed.
 
+## Prompt presets
+
+Tone and verbiage presets live on the **User Profile** tab; built-ins can't be changed. **Manage** opens the preset editor where you can duplicate a built-in or create your own. Your presets are saved in `user/prompt_presets.json`.
+
+**Base Prompt** is the suit's core instruction block: duplicate it, edit the copy, **Activate** to apply. It shapes every line the suit speaks. Change with care.
+
+**Combination Test** runs any tone + verbiage pairing against a real in-game phrase: pick category and phrase, check the exact prompt, **Generate Test Phrase** to generate with the local model (loads on first use).
+
 ## Voice cloning
 
 Easiest: use the **Clone a Voice** panel in the manager's **Voice Model** tab (pick a name and a clean sample, press Clone Voice). To do it by hand instead:
@@ -40,7 +48,7 @@ Easiest: use the **Clone a Voice** panel in the manager's **Voice Model** tab (p
 3. The voice appears in the **Voice Model** tab - select it and press **Set as Active Voice**;
    the running engine picks it up automatically.
 
-Clones stay local in `user/pocket_voices/` (gitignored). A voice state must be exported for the pinned model (`english_2026-10`); states for other model versions won't load. Remove a clone via **Remove Voice** in the Voice Model tab. If `export-voice` reports "voice cloning unsupported", log in once with `hf auth login` (free HuggingFace account, accept the model's terms) and retry.
+Clones stay local in `user/pocket_voices/`. A voice state must be exported for the pinned model (`english_2026-10`); states for other model versions won't load. Remove a clone via **Remove Voice** in the Voice Model tab. If `export-voice` reports "voice cloning unsupported", log in once with `hf auth login` (free HuggingFace account, accept the model's terms) and retry.
 
 ## Shutting it down
 

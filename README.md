@@ -5,6 +5,7 @@
 - Remove Wwise. Voice audio is packed into the game's format by a small standalone tool ([wav2wem](https://github.com/pas2k/wav2wem)).
 - The manager UI is rebuilt in [PySide6](https://code.qt.io/cgit/pyside/pyside-setup.git/), replacing the old tkinter-based dashboard.
 - Setup, voice picking, sound tuning, presets, and a live view of the engine all happen in the manager; removed old installation scripts.
+- User editable prompt presets for tone and verbiage, plus a tester to see how any pairing generates with a real in-game phrase.
 - Changing voice or tweaking audio parameters quietly re-records the affected lines in the background.
 - Lock application to local files.
 - Game path, voice, and other preferences stored in an untracked settings file that persists through updates.

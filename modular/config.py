@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from llama_cpp import Llama, Optional
 from modular import tts_utils
+from modular import prompt_presets
+from modular.prompt_utils import build_promptdata
 from modular.path_utils import resolve_mod_wem_dir
 
 def load_json(path: Path) -> dict:
@@ -98,6 +100,7 @@ class SuitVoiceConfig:
 
         self.suit_voice_base_path = self.resolve_json_path(files.get("base_prompt"), root_dir, must_exist=True)
         self.suit_voice_base = self.suit_voice_base_path.read_text(encoding="utf-8")
+        self.suit_voice_base_builtin = self.suit_voice_base  # pristine built-in for base-prompt switching
 
         self.suit_voice_dynamic_path = self.resolve_json_path(files.get("dynamic_prompt"), root_dir, must_exist=True)
         self.suit_voice_dynamic = self.suit_voice_dynamic_path.read_text(encoding="utf-8")
@@ -110,7 +113,6 @@ class SuitVoiceConfig:
 
         # --- COMBAT / CATEGORY METRIC SETTING ---
         combat_cfg = self.llm_prompting.get("combat", {})
-        self.milcat_enable_reasoning = combat_cfg.get("allow_reasoning", True)
         self.mil_cat = combat_cfg.get("special_categories", [])
 
         labels = self.llm_prompting.get("category_labels", {})
@@ -123,22 +125,18 @@ class SuitVoiceConfig:
         # --- Inside your Config Class Initialization ---
         self.promptdata_path = self.resolve_json_path(files.get("prompt_data"), root_dir, must_exist=True)
         raw_prompt_json = json.loads(self.promptdata_path.read_text(encoding="utf-8"))
+        raw_prompt_json = self._merge_prompt_presets(raw_prompt_json)
 
         # Structured descriptions for the manager UI
         self.ui_promptdata = raw_prompt_json
 
         # Flatten the dictionary dynamically in memory for the backend AI engine!
         # This keeps the rest of your text generation loops 100% stable and untouched.
-        self.promptdata = {
-            "wordiness": {
-                key: (val["prompt"] if isinstance(val, dict) else val)
-                for key, val in raw_prompt_json.get("wordiness", {}).items()
-            },
-            "tones": {
-                key: (val["prompt"] if isinstance(val, dict) else val)
-                for key, val in raw_prompt_json.get("tones", {}).items()
-            }
-        }
+        # Tones/wordiness flatten to prompt strings; per-category context stays intact.
+        self.promptdata = build_promptdata(raw_prompt_json)
+
+        # Apply the user's active base prompt variant (Default = the built-in file).
+        self.suit_voice_base = self._resolve_base()
 
         # Keep your existing state trackers exactly as they are
         self.current_tone = phrase_settings.get("tone", "Standard")
@@ -178,21 +176,50 @@ class SuitVoiceConfig:
         self.llm_model = str(self.resolve_json_path(models.get("llm_model"), root_dir, must_exist=True))
         self.llm = None  # You can also use self.llm: Optional[Llama] = None if it squawks here too
         if init_llm:
-            self.llm = Llama(
-                model_path=self.llm_model,
-                n_ctx=40960,
-                n_batch=1024,
-                n_threads=min(os.cpu_count() or 4, 8),  # guard the hardware footprint
-                verbose=False
-            )
+            self.load_llm()
 
         self.recent_lines_text = {}  # Runtime session state cache tracker: {wem_id_str: [line1, line2, ...]}
 
+    def load_llm(self):
+        """Construct the llama.cpp engine from the configured model (used by the
+        pipeline at init and lazily by the manager's combination test)."""
+        self.llm = Llama(
+            model_path=self.llm_model,
+            n_ctx=40960,
+            n_batch=1024,
+            n_threads=min(os.cpu_count() or 4, 8),  # guard the hardware footprint
+            verbose=False
+        )
+        return self.llm
+
+    def _merge_prompt_presets(self, raw_prompt_json: dict) -> dict:
+        """Fold user prompt presets (user/prompt_presets.json) into the built-in sections."""
+        try:
+            presets = prompt_presets.load_presets(self.root_dir)
+        except Exception:
+            presets = {}
+        self._active_presets = presets
+        merged = dict(raw_prompt_json)
+        for section in prompt_presets.SECTIONS:
+            base = dict(merged.get(section, {}))
+            for name, entry in presets.get(section, {}).items():
+                if name not in base:  # built-ins stay immutable
+                    base[name] = entry
+            merged[section] = base
+        return merged
+
+    def _resolve_base(self) -> str:
+        """Return the active base prompt text (user variant or the built-in file)."""
+        presets = getattr(self, "_active_presets", None) or {}
+        builtin = getattr(self, "suit_voice_base_builtin", None) or self.suit_voice_base
+        return prompt_presets.resolve_base(builtin, presets)
+
     def settings_mtime(self) -> float:
-        """Newest mtime across the two live-editable settings files (0.0 if none exist)."""
+        """Newest mtime across the live-editable settings files (0.0 if none exist)."""
         candidates = [
             self.user_customization_path,
             self.root_dir / "config" / "environment_config.json",
+            prompt_presets.presets_path(self.root_dir),
         ]
         mtimes = [p.stat().st_mtime for p in candidates if p.is_file()]
         return max(mtimes) if mtimes else 0.0
@@ -238,6 +265,20 @@ class SuitVoiceConfig:
         new_wordiness = phrase_settings.get("wordiness", "Standard")
         _track("wordiness", self.current_wordiness, new_wordiness)
         self.current_wordiness = new_wordiness
+
+        # Re-merge user prompt presets so manager edits land without a restart.
+        try:
+            raw_prompt_json = json.loads(self.promptdata_path.read_text(encoding="utf-8"))
+            merged_prompt_json = self._merge_prompt_presets(raw_prompt_json)
+            _track("prompt presets", self.ui_promptdata, merged_prompt_json)
+            self.ui_promptdata = merged_prompt_json
+            self.promptdata = build_promptdata(merged_prompt_json)
+            # Active base prompt variant (user rewrite or the built-in file).
+            new_base = self._resolve_base()
+            _track("base prompt", self.suit_voice_base, new_base)
+            self.suit_voice_base = new_base
+        except Exception:
+            pass
 
         new_effects = self.customization.get("voice_effects", {})
         _track("audio effects", self.voice_effects, new_effects)

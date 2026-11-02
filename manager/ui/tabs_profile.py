@@ -2,7 +2,19 @@
 import json
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from modular import prompt_presets
+from ui.preset_manager import PresetManagerDialog
 
 
 class ProfileTab(QWidget):
@@ -38,34 +50,93 @@ class ProfileTab(QWidget):
         prefs = QGroupBox(" Companion Preferences ")
         root_layout.addWidget(prefs)
         prefs_layout = QVBoxLayout(prefs)
+        self._presets = prompt_presets.load_presets(window.project_root)
 
         row1 = QHBoxLayout()
         prefs_layout.addLayout(row1)
         row1.addWidget(QLabel("Companion AI Tone Profile:"))
         self.tone_combo = QComboBox()
-        self.tone_combo.addItems(window.available_tones)
+        self._populate_combo(self.tone_combo, "tones", window.available_tones)
         self.tone_combo.setCurrentText(phrase_settings.get("tone", "Standard"))
         row1.addWidget(self.tone_combo)
+        row1.addStretch(1)
+        manage_btn = QPushButton("Manage")
+        manage_btn.setToolTip("Inspect prompt texts, manage custom presets and test tone + verbiage combinations.")
+        manage_btn.clicked.connect(self._manage_prompts)
+        row1.addWidget(manage_btn)
         self.tone_desc = QLabel("")
         self.tone_desc.setStyleSheet("color: #8a8a8a; font-style: italic;")
-        row1.addWidget(self.tone_desc, 1)
+        self.tone_desc.setWordWrap(True)
+        self.tone_desc.setContentsMargins(24, 0, 0, 0)
+        prefs_layout.addWidget(self.tone_desc)
 
         row2 = QHBoxLayout()
         prefs_layout.addLayout(row2)
         row2.addWidget(QLabel("Companion AI Verbiage Style:"))
         self.wordiness_combo = QComboBox()
-        self.wordiness_combo.addItems(window.available_wordiness)
+        self._populate_combo(self.wordiness_combo, "wordiness", window.available_wordiness)
         self.wordiness_combo.setCurrentText(phrase_settings.get("wordiness", "Standard"))
         row2.addWidget(self.wordiness_combo)
+        row2.addStretch(1)
         self.wordiness_desc = QLabel("")
         self.wordiness_desc.setStyleSheet("color: #8a8a8a; font-style: italic;")
-        row2.addWidget(self.wordiness_desc, 1)
+        self.wordiness_desc.setWordWrap(True)
+        self.wordiness_desc.setContentsMargins(24, 0, 0, 0)
+        prefs_layout.addWidget(self.wordiness_desc)
 
         self.tone_combo.currentTextChanged.connect(lambda _t: self.update_live_descriptions())
         self.wordiness_combo.currentTextChanged.connect(lambda _t: self.update_live_descriptions())
         self._refresh_briefing_text()
 
     # ---------------------------------------------------------------- helpers
+    def _populate_combo(self, combo, section, builtin_names):
+        """Fill a combo with built-ins, a separator, then this user's presets."""
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItems(list(builtin_names))
+        user_names = [n for n in self._presets.get(section, {}) if n not in builtin_names]
+        if user_names:
+            combo.insertSeparator(combo.count())
+            combo.addItems(user_names)
+        combo.blockSignals(False)
+
+    def _refresh_combos(self):
+        """Re-read user presets from disk and rebuild both combos, keeping
+        the current selection when it still exists (else fall back to Standard)."""
+        self._presets = prompt_presets.load_presets(self.window.project_root)
+        for combo, builtin, section in (
+            (self.tone_combo, self.window.available_tones, "tones"),
+            (self.wordiness_combo, self.window.available_wordiness, "wordiness"),
+        ):
+            previous = combo.currentText()
+            self._populate_combo(combo, section, builtin)
+            if combo.findText(previous) >= 0:
+                combo.setCurrentText(previous)
+            else:
+                combo.setCurrentText("Standard")
+        self.update_live_descriptions()
+
+    def _manage_prompts(self):
+        """Open the unified prompt manager; refresh combos when it closes."""
+        dlg = PresetManagerDialog(
+            self.window.project_root,
+            tone=self.tone_combo.currentText(),
+            wordiness=self.wordiness_combo.currentText(),
+            parent=self.window,
+        )
+        if dlg.exec():
+            self._refresh_combos()
+
+    def builtin_entry(self, section, key):
+        """Return a built-in {prompt, description} entry from prompt_data.json ({} if absent)."""
+        try:
+            prompt_file = self.window.project_root / "data" / "prompt_data.json"
+            with open(prompt_file, "r", encoding="utf-8") as f:
+                pdata = json.load(f)
+            return pdata.get(section, {}).get(key, {})
+        except Exception:
+            return {}
+
     def _refresh_briefing_text(self):
         current_name = self.name_edit.text().strip() or "..."
         self.briefing_label.setText(
@@ -86,17 +157,12 @@ class ProfileTab(QWidget):
         self.update_live_descriptions()
 
     def update_live_descriptions(self):
-        try:
-            prompt_file = self.window.project_root / "data" / "prompt_data.json"
-            if not prompt_file.exists():
-                return
-            with open(prompt_file, "r", encoding="utf-8") as f:
-                pdata = json.load(f)
-            tone_info = pdata.get("tones", {}).get(self.tone_combo.currentText(), {})
-            word_info = pdata.get("wordiness", {}).get(self.wordiness_combo.currentText(), {})
-            t_desc = tone_info.get("description", "") if isinstance(tone_info, dict) else ""
-            w_desc = word_info.get("description", "") if isinstance(word_info, dict) else ""
-            self.tone_desc.setText(f"\u21b3 Profile: {t_desc}")
-            self.wordiness_desc.setText(f"\u21b3 Profile: {w_desc}")
-        except Exception:
-            pass
+        """Show the selected entries' descriptions (built-ins first, then user presets)."""
+        for label, section, combo in (
+            (self.tone_desc, "tones", self.tone_combo),
+            (self.wordiness_desc, "wordiness", self.wordiness_combo),
+        ):
+            key = combo.currentText()
+            entry = self.builtin_entry(section, key) or self._presets.get(section, {}).get(key, {})
+            desc = entry.get("description", "") if isinstance(entry, dict) else ""
+            label.setText(f"\u21b3 Profile: {desc}")

@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
 # Shared resolver (stdlib-only module - safe to import before deps exist)
 sys.path.insert(0, str(PROJECT_ROOT))
-from modular.path_utils import WEM_SUBPATH, resolve_mod_root, resolve_mod_wem_dir  # noqa: E402
+from modular.path_utils import STARTER_WEMS_SUBPATH, WEM_SUBPATH, resolve_mod_root, resolve_mod_wem_dir  # noqa: E402
 
 WAV2WEM_URL = "https://github.com/pas2k/wav2wem/releases/download/v0.1/wav2wem.exe"
 WAV2WEM_SHA256 = "5a10738a73d5451ede6a526a7aa0bfe7f42b41faffe78c9b62ec9f223f91d736"
@@ -23,7 +23,7 @@ FFMPEG_ZIP_BIN_DIR = "ffmpeg-master-latest-win64-lgpl/bin"
 GEMMA_URL = "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf"
 GEMMA_RELATIVE_DIR = "assets/gemma4_e2b"
 GEMMA_FILENAME = "gemma-4-E2B-it-Q4_K_M.gguf"
-STARTER_WEMS_RELATIVE = WEM_SUBPATH
+STARTER_WEMS_RELATIVE = STARTER_WEMS_SUBPATH
 
 
 def is_setup_complete(project_root: Path = PROJECT_ROOT) -> bool:

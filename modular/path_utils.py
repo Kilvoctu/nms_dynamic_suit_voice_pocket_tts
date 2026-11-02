@@ -4,7 +4,9 @@ setup runner) can import this without pulling numpy/torch."""
 import json
 from pathlib import Path
 
+# The game's sub-path (game truth - never changes) and the repo's starter-wem copy.
 WEM_SUBPATH = Path("DYNAMIC_SUIT_VOICE/AUDIO/WINDOWS/MEDIA/ENGLISH(US)")
+STARTER_WEMS_SUBPATH = Path("assets/starter_wems")
 
 PIPELINE_SINGLE_INSTANCE_PORT = 49152
 

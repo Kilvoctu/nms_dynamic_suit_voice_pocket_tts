@@ -29,8 +29,9 @@ extras_put_in_mods_folder/
 
 # Ignore all model-related stuff
 
-# Ignore downloaded external tool binaries (fetched by the installer)
-/tools/
+# Ignore downloaded external tool binaries (fetched by setup); the folder also
+# hosts tracked maintenance scripts, so only the binaries are excluded.
+/tools/*.exe
 
 # But keep icons/images
 !assets/**/*.png

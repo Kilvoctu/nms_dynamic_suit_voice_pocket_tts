@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from manager.setup_runner import SetupRunner
-from modular.path_utils import is_pipeline_running, purge_cache_audio, resolve_mod_root
+from modular.path_utils import is_pipeline_running, purge_cache_audio, resolve_mod_root, resolve_mod_wem_dir
 
 
 class SystemTab(QWidget):
@@ -345,7 +345,9 @@ class SystemTab(QWidget):
                 f"Directory does not exist:\n{target}\n\nCreate it?",
             ) != QMessageBox.StandardButton.Yes:
                 return
-        mod_wem_dir = resolve_mod_root(target)
+        # Install into the game's nested mod sub-path (what the pipeline watches
+        # and what is_setup_complete checks), not the flat root the user typed.
+        mod_wem_dir = resolve_mod_wem_dir(target)
         if QMessageBox.question(
             self, "Confirm Setup",
             f"Voice files will be installed into:\n{mod_wem_dir}\n\n"

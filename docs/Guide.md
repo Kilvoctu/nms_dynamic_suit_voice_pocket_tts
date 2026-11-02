@@ -11,7 +11,7 @@ Repository: [nms_dynamic_suit_voice](https://github.com/Bob-Harper/nms_dynamic_s
 
 - Windows 10/11
 - Python 3.10 or 3.11 installed and on PATH (3.12+ breaks dependencies)
-- Internet access for the one-time downloads (dependencies, ffmpeg, the wav2wem encoder, the local LLM model - roughly 3 GB total)
+- Internet access for the one-time downloads (dependencies, ffmpeg, the wav2wem encoder, the local LLM model - roughly 4.5 GB total)
 
 ## Installation
 

@@ -215,22 +215,26 @@ class AudioTab(QWidget):
 
     # ------------------------------------------------------------ presets
     def _preselect_active_preset(self):
-        """Preselect the preset matching the active voice so the sliders tell the truth on launch."""
+        """Preselect the preset matching the active voice (sliders tell the truth
+        on launch); a fresh install with no committed voice defaults to Factory Standard."""
         current_voice = self.window.user_data.get("tts_voice", "")
         if not current_voice:
+            name = "Factory Standard Exosuit Core"
+            if name in self.loaded_presets:
+                # Signals blocked: the voice tab may not exist yet during
+                # construction, so the preset's voice-switch step must not run.
+                self.preset_combo.blockSignals(True)
+                self.preset_combo.setCurrentText(name)
+                self.preset_combo.blockSignals(False)
+                self._apply_preset_values(self.loaded_presets[name])
             return
         for name, preset in self.loaded_presets.items():
             if preset.get("tts_voice") == current_voice:
                 self.preset_combo.setCurrentText(name)
                 return
 
-    def _on_preset_selected(self, name: str):
-        self.delete_preset_btn.setEnabled(name in self.user_preset_names)
-        p = self.loaded_presets.get(name)
-        if not p:
-            return
-        # NOTE: gain_db is intentionally NOT applied - output volume is a
-        # personal setting and survives preset changes untouched.
+    def _apply_preset_values(self, p: dict):
+        """Dial the character sliders to a preset's values (personal volume untouched)."""
         values = {
             "pitch": p.get("pitch_semitones", 4),
             "tempo": p.get("tempo", 1.02),
@@ -244,6 +248,13 @@ class AudioTab(QWidget):
             if attr in _VALUE_SCALE:
                 value = int(round(float(value) / _VALUE_SCALE[attr]))
             slider.setValue(int(value))
+
+    def _on_preset_selected(self, name: str):
+        self.delete_preset_btn.setEnabled(name in self.user_preset_names)
+        p = self.loaded_presets.get(name)
+        if not p:
+            return
+        self._apply_preset_values(p)
 
         # A vocal signature is more than sliders: switch the audition voice too
         # (roster selection only - Apply Changes commits it to the engine).

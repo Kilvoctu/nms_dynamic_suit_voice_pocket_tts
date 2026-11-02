@@ -40,7 +40,7 @@ Tone and verbiage presets live on the **User Profile** tab; built-ins can't be c
 
 Use the **Clone a Voice** panel in the manager's **Voice Model** tab: type a name (spaces are fine and become underscores; `\ / : * ? " < > |` aren't allowed), pick a clean sample, press **Clone Voice**. The first clone downloads the cloning model once (online, from Hugging Face); after that, cloning and the voice engine itself stay fully local.
 
-A clean sample means one speaker, no music or background noise, 10-30 seconds, as a `.wav` file. The voice appears in the **Voice Model** tab - select it and press **Set as Active Voice**; the running engine picks it up automatically. Clones stay local in `user/pocket_voices/`, and a voice state only loads for the pinned model (`english_2026-10`). Remove a clone via **Remove Voice**.
+A clean sample means one speaker, no music or background noise, 10-30 seconds, as a `.wav` file. The voice appears in the **Voice Model** tab - select it and press **Apply Changes** to make it your suit's voice (the engine re-renders the mod folder to match). Clones stay local in `user/pocket_voices/`, and a voice state only loads for the pinned model (`english_2026-10`). Remove a clone via **Remove Voice**.
 
 If cloning reports "voice cloning unsupported", press **Sign in & Preload Model** in the Voice Model tab: it opens a Hugging Face sign-in window (paste an access token from huggingface.co - free account, create one under Settings → Access Tokens and accept the model's terms there) and then downloads the cloning model. The sign-in is remembered on your PC, so press **Clone Voice** again and it works from then on.
 

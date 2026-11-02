@@ -184,10 +184,27 @@ class MainWindow(QMainWindow):
                 pass
 
     def refresh_voice_highlight(self):
-        """Re-render the Voice Model tab's active-voice highlight (used when a preset switches the voice)."""
+        """Re-render the Voice Model tab's active-voice highlight (the committed state becomes the truth)."""
         voice_tab = self.tabs.widget(2) if not self.setup_pending else None
         if voice_tab is not None and hasattr(voice_tab, "_refresh_catalog"):
             voice_tab._refresh_catalog()
+
+    def audition_voice(self) -> str:
+        """The voice the audio sandbox should render with: the voice tab's roster
+        selection (possibly not yet committed), else the committed active voice."""
+        voice_tab = self.tabs.widget(2) if not self.setup_pending else None
+        if voice_tab is not None:
+            key = voice_tab._selected_key()
+            if key:
+                return key
+        return self.user_data.get("tts_voice", "")
+
+    def select_voice_in_roster(self, key: str) -> bool:
+        """Move the Voice Model tab's roster selection to key (preset voice switches)."""
+        voice_tab = self.tabs.widget(2) if not self.setup_pending else None
+        if voice_tab is None or not hasattr(voice_tab, "_select_by_key"):
+            return False
+        return voice_tab._select_by_key(key)
 
     def save_and_continue_settings(self):
         self._execute_file_save_matrix()
@@ -238,9 +255,11 @@ class MainWindow(QMainWindow):
             fx.update(audio_tab._slider_values())
             updated["voice_effects"] = fx
         if voice_tab is not None:
-            # the voice tab writes tts_voice itself on Apply; keep current value
-            pass
+            # Commit the voice tab's selection (a fresh roster pick or a preset-switched one).
+            updated["tts_voice"] = voice_tab._selected_key() or updated.get("tts_voice", "fantine")
         self.user_config_file.write_text(json.dumps(updated, indent=4), encoding="utf-8")
+        if voice_tab is not None:
+            self.refresh_voice_highlight()  # move the ACTIVE marker to the committed voice
 
     # ------------------------------------------------- tray icon
     def _setup_tray_icon(self):

@@ -245,13 +245,15 @@ class AudioTab(QWidget):
                 value = int(round(float(value) / _VALUE_SCALE[attr]))
             slider.setValue(int(value))
 
-        # A vocal signature is more than sliders: switch the synthesis voice too.
+        # A vocal signature is more than sliders: switch the audition voice too
+        # (roster selection only - Apply Changes commits it to the engine).
         preset_voice = p.get("tts_voice")
-        if preset_voice and self.window.user_data.get("tts_voice") != preset_voice:
-            self.window.user_data["tts_voice"] = preset_voice
-            self.window.refresh_voice_highlight()
-            self._log(f" Voice signature switched to '{preset_voice}'. "
-                      "Apply Changes and the running engine picks it up automatically.")
+        if preset_voice and self.window.audition_voice() != preset_voice:
+            if self.window.select_voice_in_roster(preset_voice):
+                self._log(f" Voice signature switched to '{preset_voice}'. "
+                          "Apply Changes to commit it to the running engine.")
+            else:
+                self._log(f" Preset voice '{preset_voice}' is not in the roster.")
 
         self._log(f" {p.get('description', 'Preset loaded.')}")
 
@@ -279,7 +281,7 @@ class AudioTab(QWidget):
                 self, "Save Preset", f"'{name}' is a built-in preset; pick another name."
             )
             return
-        voice = self.window.user_data.get("tts_voice", "")
+        voice = self.window.audition_voice()
         values = self._slider_values()
         values.pop("gain_db", None)  # output volume stays personal, like the built-ins
         self.user_presets[name] = {"description": "User preset.", "tts_voice": voice, **values}
@@ -350,7 +352,7 @@ class AudioTab(QWidget):
         self._test_inputs = {
             "text_payload": self.test_text.toPlainText().strip(),
             "fx": self._slider_values(),
-            "voice": self.window.user_data.get("tts_voice") or tts_utils.POCKET_DEFAULT_VOICE,
+            "voice": self.window.audition_voice() or tts_utils.POCKET_DEFAULT_VOICE,
         }
         self._log(" Starting background voice synthesis sequence...")
         self._test_thread = FunctionThread(self._audio_test_job, self)

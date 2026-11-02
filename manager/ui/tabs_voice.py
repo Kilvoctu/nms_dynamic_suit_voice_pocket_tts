@@ -79,8 +79,8 @@ class VoiceModelTab(QWidget):
         self.apply_btn = QPushButton("Set as Active Voice")
         self.apply_btn.clicked.connect(self._activate_selected_voice)
         self.apply_btn.setToolTip(
-            "Makes the selected voice your suit's voice. The running engine applies\n"
-            "it automatically and re-renders the mod folder to match."
+            "Marks the selected voice as the one to use. Nothing is written until\n"
+            "you press Apply Changes (which re-renders the mod folder to match)."
         )
         buttons.addWidget(self.apply_btn)
         self.warm_btn = QPushButton("Warm Voice Weights")
@@ -210,6 +210,7 @@ class VoiceModelTab(QWidget):
         return self.window.user_data.get("tts_voice") or tts_utils.POCKET_DEFAULT_VOICE
 
     def _refresh_catalog(self):
+        self._pending_voice = None  # a refresh means the committed state is the truth
         self.voice_list.blockSignals(True)
         self.voice_list.clear()
         catalog = self._catalog()
@@ -282,8 +283,12 @@ class VoiceModelTab(QWidget):
             self.meta_status.setStyleSheet("font-weight: bold; color: #4ADE80;")
             self.apply_btn.setEnabled(False)
         elif ready:
-            self.meta_status.setText("Status: Ready on Local Disk")
-            self.meta_status.setStyleSheet("font-weight: bold; color: #FBBF24;")
+            if key == getattr(self, "_pending_voice", None):
+                self.meta_status.setText("Status: Selected - applies when you press Apply Changes")
+                self.meta_status.setStyleSheet("font-weight: bold; color: #60A5FA;")
+            else:
+                self.meta_status.setText("Status: Ready on Local Disk")
+                self.meta_status.setStyleSheet("font-weight: bold; color: #FBBF24;")
             self.apply_btn.setEnabled(True)
         else:
             self.meta_status.setText("Status: Not Cloned (State Missing)")
@@ -296,19 +301,20 @@ class VoiceModelTab(QWidget):
         key = self._selected_key()
         if key is None:
             return
-        try:
-            user_data = {}
-            if self.window.user_config_file.exists():
-                with open(self.window.user_config_file, "r", encoding="utf-8") as f:
-                    user_data = json.load(f)
-            user_data["tts_voice"] = key
-            with open(self.window.user_config_file, "w", encoding="utf-8") as f:
-                json.dump(user_data, f, indent=4)
-            self.window.user_data = user_data
-            self._refresh_catalog()
-            self._on_selection_change(0)
-        except Exception as e:
-            QMessageBox.critical(self, "Configuration Error", f"Could not preserve target voice choice: {e}")
+        # Pending only: Apply Changes commits tts_voice (one re-record sweep, like tone/verbiage).
+        self._pending_voice = key
+        self._on_selection_change(self.voice_list.currentRow())
+
+    def _select_by_key(self, key: str) -> bool:
+        """Move the roster selection to key (used when a preset switches the audition voice)."""
+        info = self._catalog().get(key)
+        if not info:
+            return False
+        for index in range(self.voice_list.count()):
+            if self.voice_list.item(index).text().split("] ", 1)[-1].strip() == info["name"]:
+                self.voice_list.setCurrentRow(index)
+                return True
+        return False
 
     def _trigger_async_warm(self):
         key = self._selected_key()
@@ -550,8 +556,7 @@ class VoiceModelTab(QWidget):
             QMessageBox.information(
                 self, "Success",
                 f"Cloned voice '{name}' is ready.\n\n"
-                "Select it and press Set as Active Voice - the running engine\n"
-                "picks it up automatically.",
+                "Select it and press Apply Changes to make it your suit's voice.",
             )
         else:
             self.download_progress.setText("Clone Queue: Failed.")

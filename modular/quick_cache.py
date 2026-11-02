@@ -294,6 +294,7 @@ def _maybe_start_filler_round():
         return
     prefix_base = f"{_voice_tag(getattr(config, 'tts_voice', '') or 'unknown')}_{_settings_fingerprint(config)}_"
     to_queue = []
+    depth_sum = depth_count = 0
     for wem_id, info in config.intent_map.items():
         if str(info.get("Used", "")).strip().lower() != "yes":
             continue
@@ -301,8 +302,11 @@ def _maybe_start_filler_round():
         with _jobs_lock:
             pending = _active_jobs_count.get(str(wem_id), 0)
         have = len(list(wem_dir.glob(f"{wem_id}_{prefix_base}*.wem"))) if wem_dir.is_dir() else 0
-        if have + pending < max_depth:
+        under = have + pending < max_depth
+        if under:
             to_queue.append((wem_id, wem_dir))
+        depth_sum += have + pending + (1 if under else 0)
+        depth_count += 1
     if not to_queue:
         return
     # Reserve the round atomically so a chained call can't double-start, and so
@@ -313,7 +317,8 @@ def _maybe_start_filler_round():
         _filler_round_pending += len(to_queue)
     for wem_id, wem_dir in to_queue:
         enqueue_job(_replacement_wrapper, config, wem_id, wem_dir, True, priority=30)
-    print(f"[Cache] Filler round: +1 variant for {len(to_queue)} line(s) toward depth {max_depth}.")
+    depth_now = depth_sum / depth_count if depth_count else 0
+    print(f"[Cache] Filler round: +1 variant for {len(to_queue)} line(s) - depth now {depth_now:.1f}/{max_depth}.")
 
 
 def _enqueue_restock(config, wem_id, wem_dir, rephrase, inventory):

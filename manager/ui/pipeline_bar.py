@@ -43,6 +43,8 @@ class PipelineBar(QFrame):
         self._title_suffix = "Starting"
         self._flash_until = 0.0  # monotonic deadline of a transient status message
         self._flash_text = None
+        self._depth_checked = 0.0  # cache-depth readout, refreshed every ~5s
+        self._depth_text = ""
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 4, 10, 6)
@@ -136,6 +138,22 @@ class PipelineBar(QFrame):
         except Exception:
             return 0
 
+    def _cache_depth_text(self):
+        if time.time() - self._depth_checked < 5:
+            return self._depth_text
+        self._depth_checked = time.time()
+        text = ""
+        try:
+            cache_dir = Path(self.window.project_root) / "cache" / "tmp_quick_dir"
+            counts = [len(list(d.glob("*.wem"))) for d in cache_dir.iterdir() if d.is_dir()]
+            target = int(self.window.env_data.get("runtime", {}).get("quick_cache_max", 16))
+            if counts:
+                text = f" · {sum(counts) / len(counts):.1f}/{target} iterations pre-cached"
+        except OSError:
+            pass
+        self._depth_text = text
+        return text
+
     def _refresh(self):
         if self._flash_text is not None:
             if time.monotonic() < self._flash_until:
@@ -166,6 +184,7 @@ class PipelineBar(QFrame):
                 self._set_state("Status: Stopping...", "#FBBF24", False, False, "Stopping...")
             else:
                 queued = self._read_generation_queue(status)
+                depth = self._cache_depth_text()
                 if queued > 0:
                     # The engine is synthesizing in the background - say so
                     # instead of a frozen "Ready" (amber = activity).
@@ -176,7 +195,7 @@ class PipelineBar(QFrame):
                     base = detail or "listening for game lines"
                     color = "#4ADE80"
                 self._set_state(
-                    f"Status: Running - {base}",
+                    f"Status: Running - {base}{depth}",
                     color, False, True, f"Running ({detail or 'ready'})",
                 )
         else:

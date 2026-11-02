@@ -126,7 +126,8 @@ class PresetSectionEditor(QWidget):
         self._dirty = True
 
     def _reload_list(self, select=""):
-        """Rebuild the list: built-ins (grayed) first, then user presets."""
+        """Rebuild the list: built-ins (grayed) first, then user presets. The
+        fallback selection stays signal-blocked so no confirm can fire mid-reload."""
         self.list_widget.blockSignals(True)
         self.list_widget.clear()
         for name in self.builtin:
@@ -137,9 +138,9 @@ class PresetSectionEditor(QWidget):
             self.list_widget.addItem(name)
             if name == select:
                 self.list_widget.setCurrentRow(self.list_widget.count() - 1)
-        self.list_widget.blockSignals(False)
         if self.list_widget.currentRow() < 0 and self.list_widget.count():
             self.list_widget.setCurrentRow(0)
+        self.list_widget.blockSignals(False)
         self._last_row = self.list_widget.currentRow()
         self._refresh_from_selection()
 
@@ -222,6 +223,10 @@ class PresetSectionEditor(QWidget):
         self._dirty = False
         return True
 
+    def _after_delete(self, name: str):
+        """Hook after a preset is removed (overridden by the base prompt editor)."""
+        return None
+
     def _on_new(self):
         """Blank the pane for a fresh user preset (selection-independent)."""
         if not self._resolve_dirty():
@@ -230,7 +235,6 @@ class PresetSectionEditor(QWidget):
         self.list_widget.setCurrentRow(-1)
         self.list_widget.blockSignals(False)
         self._last_row = -1
-        self._dirty = False
         self._set_pane_editable()
         self.name_edit.clear()
         self.desc_edit.clear()
@@ -239,6 +243,7 @@ class PresetSectionEditor(QWidget):
         self.delete_btn.setEnabled(False)
         self.dup_btn.setEnabled(False)
         self.hint_label.setText("Fill in the fields and press Save to create the preset.")
+        self._dirty = False  # field clears fire textChanged; the fresh pane starts clean
         self.name_edit.setFocus()
 
     def _on_duplicate(self):
@@ -260,7 +265,6 @@ class PresetSectionEditor(QWidget):
         self.list_widget.setCurrentRow(-1)
         self.list_widget.blockSignals(False)
         self._last_row = -1
-        self._dirty = False
         self._set_pane_editable()
         self.name_edit.setText(candidate)
         self.desc_edit.setText(entry.get("description", ""))
@@ -269,6 +273,7 @@ class PresetSectionEditor(QWidget):
         self.delete_btn.setEnabled(False)
         self.dup_btn.setEnabled(False)
         self.hint_label.setText("")
+        self._dirty = False  # field sets fire textChanged; the duplicate starts clean
         self.name_edit.setFocus()
 
     def _unique_name_error(self, name: str) -> str:
@@ -319,6 +324,7 @@ class PresetSectionEditor(QWidget):
         self._after_delete(name)
         prompt_presets.save_presets(self.project_root, self.presets)
         self.current = ""
+        self._dirty = False  # the pane is about to be replaced; nothing left to save
         self._reload_list()
 
 
@@ -633,9 +639,9 @@ class BasePromptEditor(PresetSectionEditor):
             self.list_widget.addItem(f"{marker}{name}")
             if name == select:
                 self.list_widget.setCurrentRow(self.list_widget.count() - 1)
-        self.list_widget.blockSignals(False)
         if self.list_widget.currentRow() < 0 and self.list_widget.count():
             self.list_widget.setCurrentRow(0)
+        self.list_widget.blockSignals(False)
         self._last_row = self.list_widget.currentRow()
         self._refresh_from_selection()
 

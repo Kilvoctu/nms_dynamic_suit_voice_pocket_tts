@@ -1,6 +1,7 @@
 # manager/ui/tabs_voice.py - Pocket TTS voice roster and diagnostics.
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +34,14 @@ _BASE_CATALOG = {
     "eponine": ("Eponine", "FEMALE"),
     "azelma": ("Azelma", "FEMALE"),
 }
+
+_CLONE_NAME_INVALID = re.compile(r'[\\/:*?"<>|]')
+
+
+def _sanitize_clone_name(name: str) -> str:
+    """Collapse a typed voice name into a filesystem-safe key (spaces become underscores)."""
+    cleaned = _CLONE_NAME_INVALID.sub("", name.strip())
+    return re.sub(r"\s+", "_", cleaned)
 
 
 class VoiceModelTab(QWidget):
@@ -116,10 +125,15 @@ class VoiceModelTab(QWidget):
         name_row.addWidget(QLabel("Name:"))
         self.clone_name_edit = QLineEdit()
         self.clone_name_edit.setPlaceholderText("myvoice")
-        self.clone_name_edit.setToolTip("Letters, digits, dashes and underscores only.")
+        self.clone_name_edit.setToolTip('Spaces become underscores; \\ / : * ? " < > | are not allowed.')
         self.clone_name_edit.textChanged.connect(self._update_clone_button)
         name_row.addWidget(self.clone_name_edit, 1)
         clone_layout.addLayout(name_row)
+        self.clone_name_hint = QLabel("")
+        self.clone_name_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.clone_name_hint.setWordWrap(True)
+        self.clone_name_hint.setVisible(False)  # collapses the layout line until needed
+        clone_layout.addWidget(self.clone_name_hint)
 
         sample_row = QHBoxLayout()
         self.clone_sample_btn = QPushButton("Choose Sample...")
@@ -304,12 +318,23 @@ class VoiceModelTab(QWidget):
 
     def _update_clone_button(self):
         name = self.clone_name_edit.text().strip()
-        valid = bool(name) and all(c.isalnum() or c in "-_" for c in name)
+        invalid = bool(_CLONE_NAME_INVALID.search(name))
+        valid = bool(name) and not invalid
         busy = self._clone_thread is not None
         self.clone_btn.setEnabled(valid and self._clone_sample_path is not None and not busy)
+        if invalid:
+            self.clone_name_hint.setStyleSheet("color: #FBBF24; font-style: italic;")
+            self.clone_name_hint.setText('That name contains a character Windows paths cannot use: \\ / : * ? " < > |')
+        elif valid and _sanitize_clone_name(name) != name:
+            self.clone_name_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
+            self.clone_name_hint.setText(f"Will be cloned as: {_sanitize_clone_name(name)}")
+        else:
+            self.clone_name_hint.setText("")
+        # An empty label still reserves its layout line - collapse it entirely.
+        self.clone_name_hint.setVisible(bool(self.clone_name_hint.text()))
 
     def _trigger_async_clone(self):
-        name = self.clone_name_edit.text().strip()
+        name = _sanitize_clone_name(self.clone_name_edit.text())
         sample = self._clone_sample_path
         if not name or not sample:
             return
@@ -344,6 +369,11 @@ class VoiceModelTab(QWidget):
         env = dict(os.environ)
         for flag in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
             env.pop(flag, None)
+        tts_utils._ensure_pocket_cache_env(self.window.project_root)
+        env.setdefault("HF_HOME", str(self.window.project_root / "cache"))
+        hub_dir = self.window.project_root / "cache" / "hub"
+        env.setdefault("HF_HUB_CACHE", str(hub_dir))
+        env.setdefault("HUGGINGFACE_HUB_CACHE", str(hub_dir))
         if not env.get("HF_TOKEN"):
             token_file = Path.home() / ".cache" / "huggingface" / "token"
             if token_file.is_file():

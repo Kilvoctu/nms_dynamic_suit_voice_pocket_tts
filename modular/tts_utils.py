@@ -79,6 +79,7 @@ def pocket_custom_voice_state_path(project_root, voice: str, model_name: str):
 
 def list_pocket_voices(project_root, model_name: str = POCKET_DEFAULT_MODEL) -> list:
     """Predefined voices plus custom cloned voices that have a usable saved state."""
+    _ensure_pocket_cache_env(project_root)
     voices = list(POCKET_VOICE_GENDERS["Male"] + POCKET_VOICE_GENDERS["Female"])
     voices_dir = Path(project_root) / "user" / "pocket_voices"
     if voices_dir.is_dir():

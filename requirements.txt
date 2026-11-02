@@ -5,7 +5,7 @@
 pocket-tts>=4.0.1
 numpy
 scipy
-llama-cpp-python>=0.3.1.6
+llama-cpp-python==0.3.36
 Pillow>=11.3.0,<12
 pystray>=0.19.5,<0.20
 PySide6-Essentials>=6.11.2

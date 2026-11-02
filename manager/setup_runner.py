@@ -114,7 +114,7 @@ class SetupRunner:
         self.log("Installing Python dependencies (pocket-tts pulls torch; this can take a few minutes)...")
         started = time.monotonic()
         result = subprocess.run(
-            [str(self.venv_python), "-m", "pip", "install", "--prefer-binary", "-r", "requirements.txt"],
+            [str(self.venv_python), "-m", "pip", "install", "--prefer-binary", "--only-binary=llama-cpp-python", "-r", "requirements.txt"],
             cwd=self.project_root, capture_output=True, text=True,
             creationflags=0x08000000 if sys.platform == "win32" else 0,
         )

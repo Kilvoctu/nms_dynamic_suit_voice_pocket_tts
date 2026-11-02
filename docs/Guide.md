@@ -1,4 +1,4 @@
-# Dynamic No Man's Sky Suit AI Voice Mod Installation
+# Dynamic No Man's Sky Suit AI Voice Mod Guide
 
 Version: 2.0 (fork)<br>
 Original Author: [Bob-Harper](https://github.com/Bob-Harper)<br>

@@ -123,6 +123,20 @@ class SetupRunner:
             raise RuntimeError(f"pip install failed:\n{tail}")
         self.log(f"  dependencies installed in {time.monotonic() - started:.1f}s")
 
+    def step_named_copies(self):
+        """Named interpreter copies for Task Manager clarity (best-effort; the
+        plain pythonw fallback keeps everything working without them)."""
+        try:
+            sys.path.insert(0, str(Path(__file__).parent))
+            from interpreter_copies import ensure_copies
+            made = ensure_copies(self.project_root)
+        except Exception:
+            made = {}
+        if made:
+            self.log(f"  named process copies ready: {', '.join(sorted(made))}.")
+        else:
+            self.log("  named process copies skipped (plain pythonw will be used).")
+
     def step_ffmpeg(self):
         ffmpeg_exe = self.project_root / "tools" / "ffmpeg.exe"
         if ffmpeg_exe.is_file():
@@ -228,6 +242,7 @@ class SetupRunner:
     def run(self):
         steps = [
             ("Python environment", self.step_venv_and_deps),
+            ("Named process copies", self.step_named_copies),
             ("ffmpeg", self.step_ffmpeg),
             ("wav2wem encoder", self.step_wav2wem),
             ("LLM rephrasing model", self.step_model),

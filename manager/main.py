@@ -91,6 +91,15 @@ def _main() -> None:
     _boot_log("--- manager session start ---")
     _boot_log("imports ok")
 
+    # Named interpreter copies (Task Manager clarity); silent no-op outside the venv.
+    try:
+        from interpreter_copies import ensure_copies
+        made = ensure_copies(Path(__file__).parent.parent)
+        if made:
+            _boot_log(f"interpreter copies ready: {', '.join(sorted(made))}")
+    except Exception as e:
+        _boot_log(f"interpreter copies skipped: {e}")
+
     def _event_loop_hook(exc_type, exc, tb):
         """PySide6 aborts natively on unhandled slot exceptions; this hook still logs the traceback."""
         detail = "".join(traceback.format_exception(exc_type, exc, tb))

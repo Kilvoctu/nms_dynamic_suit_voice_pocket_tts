@@ -126,9 +126,8 @@ class PipelineBar(QFrame):
         self._render_status_text()
 
     def _read_generation_queue(self, status: dict) -> int:
-        """Pending background generation count published by the engine's cache
-        (cache/pipeline_queue.json). A sidecar from a previous engine process
-        (pid mismatch) reads as 0 so stale files can't fake live activity."""
+        """Pending background generation count from the engine's sidecar (pid-checked:
+        a file left by a previous engine process reads as 0, never fake activity)."""
         try:
             path = Path(self.window.project_root) / "cache" / "pipeline_queue.json"
             entry = json.loads(path.read_text(encoding="utf-8"))

@@ -1,11 +1,110 @@
 # nms_dynamic_suit_voice_pipeline.py (Streamlined Version)
+import ctypes
+import json
 import os
 import time
+from ctypes import wintypes
 from pathlib import Path
 from modular.quick_cache import (begin_sweep_wave, end_sweep_wave, get_cached_wem,
                                  move_cachedfile_to_mod_dir, update_access_time_to_match_newfile)
 from PIL import Image
 # NOTE: No global config or TTS instantiations live at the top of this file anymore!
+
+# --- Windows change-notification watch: the OS reports file access, so the watch
+# --- loop idles at ~0 cpu instead of stat-polling every wem file each tick.
+_KERNEL32 = ctypes.windll.kernel32
+_NOTIFY_BUFFER_SIZE = 64 * 1024
+_NOTIFY_FILTER_LAST_ACCESS = 0x0020
+_NOTIFY_BUFFER_OVERFLOW = 234
+class _Overlapped(ctypes.Structure):
+    _fields_ = [("internal", ctypes.c_void_p), ("internal_high", ctypes.c_void_p),
+                ("offset", wintypes.DWORD), ("offset_high", wintypes.DWORD),
+                ("hEvent", wintypes.HANDLE)]
+_CreateFileW = _KERNEL32.CreateFileW
+_CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+                         wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+_CreateFileW.restype = wintypes.HANDLE
+_ReadDirectoryChangesW = _KERNEL32.ReadDirectoryChangesW
+_ReadDirectoryChangesW.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, wintypes.BOOL,
+                                   wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+                                   ctypes.POINTER(_Overlapped), wintypes.LPVOID]
+_GetOverlappedResult = _KERNEL32.GetOverlappedResult
+_GetOverlappedResult.argtypes = [wintypes.HANDLE, ctypes.POINTER(_Overlapped),
+                                 ctypes.POINTER(wintypes.DWORD), wintypes.BOOL]
+_WaitForSingleObject = _KERNEL32.WaitForSingleObject
+
+
+class _NotifyInfo(ctypes.Structure):
+    _fields_ = [("next_entry", wintypes.DWORD), ("action", wintypes.DWORD),
+                ("name_length", wintypes.DWORD), ("name", wintypes.WCHAR * 1)]
+
+class _AtimeWatch:
+    """Arms ReadDirectoryChangesW (LastAccess) on one directory; wait() blocks up to
+    the given timeout and returns touched wem names ([] on quiet, None on re-open)."""
+
+    def __init__(self):
+        self._handle = None
+        self._overlapped = None
+        self._buffer = ctypes.create_string_buffer(_NOTIFY_BUFFER_SIZE)
+        self._dir = None
+
+    def open(self, directory) -> bool:
+        """(Re)arm the watch on directory; False means events are unavailable."""
+        self.close()
+        try:
+            handle = _CreateFileW(str(directory), 0x0001, 1 | 2 | 4, None, 3,
+                                  0x02000000 | 0x40000000, None)
+            if not handle or handle == wintypes.HANDLE(-1).value:
+                return False
+            overlapped = _Overlapped()
+            overlapped.hEvent = _KERNEL32.CreateEventW(None, False, False, None)
+            read = wintypes.DWORD(0)
+            ok = _ReadDirectoryChangesW(handle, self._buffer, _NOTIFY_BUFFER_SIZE, False,
+                                        _NOTIFY_FILTER_LAST_ACCESS, ctypes.byref(read),
+                                        ctypes.byref(overlapped), None)
+            if not ok:
+                _KERNEL32.CloseHandle(handle)
+                return False
+            self._handle, self._overlapped, self._dir = handle, overlapped, directory
+            return True
+        except Exception:
+            return False
+
+    def close(self):
+        if self._handle:
+            try:
+                _KERNEL32.CloseHandle(self._handle)
+            except Exception:
+                pass
+        self._handle, self._overlapped, self._dir = None, None, None
+
+    def wait(self, timeout_s: float):
+        """Block up to timeout_s; returns touched wem names ([] = quiet, None = rescan)."""
+        if not self._handle:
+            return None
+        wait = _WaitForSingleObject(self._overlapped.hEvent, int(timeout_s * 1000))
+        if wait != 0:  # timeout or failure: the read stays armed for the next call
+            return []
+        read = wintypes.DWORD(0)
+        ok = _GetOverlappedResult(self._handle, ctypes.byref(self._overlapped),
+                                  ctypes.byref(read), False)
+        data_copy = self._buffer.raw[:read.value] if ok and read.value else b""
+        if not ok:
+            self.open(self._dir)  # error or overflow: re-arm, caller rescans
+            return None
+        self.open(self._dir)  # re-arm immediately so no window is left unwatched
+        names, pos = [], 0
+        while pos + 12 <= len(data_copy):
+            info = _NotifyInfo.from_buffer_copy(data_copy, pos)
+            if info.name_length:
+                name = ctypes.wstring_at(ctypes.addressof(info) + 12, info.name_length // 2)
+                if name.lower().endswith(".wem"):
+                    names.append(name[:-4])
+            if not info.next_entry:
+                break
+            pos += info.next_entry
+        return names
+
 
 def _scan_atimes(directory):
     """True per-file stats: scandir's enumerated atime lags minutes behind on NTFS
@@ -62,30 +161,69 @@ def watch_wems(wtray_ui, config):
     _fire_queue = _queue.Queue()
     _access = access_times  # shared, always touch under _watch_lock
 
-    # CSV transcriptions for logging untracked plays (the intent map may not know the line).
-    _csv_transcripts = {}
+    # CSV rows for logging untracked plays and auto-learning (the intent map may not know the line).
+    _csv_rows = {}
     try:
         import csv as _csv
         with open(config.transcripts_path.with_suffix(".csv"), newline="", encoding="utf-8") as _fh:
-            _csv_transcripts = {r["WEM_number"]: r["Transcription"] for r in _csv.DictReader(_fh)
-                                if r.get("WEM_number")}
+            _csv_rows = {r["WEM_number"]: r for r in _csv.DictReader(_fh) if r.get("WEM_number")}
     except Exception:
-        pass  # logging-only convenience
+        pass  # logging/learning convenience
+
+    # Re-attach previously auto-learned lines so they are managed from boot.
+    try:
+        learned = json.loads((config.root_dir / "user" / "learned_transcripts.json").read_text(encoding="utf-8"))
+        merged = {k: v for k, v in learned.items()
+                  if k not in config.intent_map and str(v.get("Used", "")).strip().lower() == "yes"}
+        if merged:
+            config.intent_map.update(merged)
+            print(f"[Watch] Managing {len(merged)} auto-learned line(s) from user/learned_transcripts.json.")
+    except Exception:
+        pass  # first run or unreadable file: nothing to merge
+
+    def _learn_line(wem_id: str, row: dict):
+        """Add a heard line to the user's learned-transcripts file and the live intent map."""
+        entry = {
+            "Filename": row.get("Filename", f"{wem_id}.wem"),
+            "Transcription": row.get("Transcription", ""),
+            "Category": row.get("Category", ""),
+            "Intent": row.get("Intent", ""),
+            "Used": "Yes",
+        }
+        learned_path = config.root_dir / "user" / "learned_transcripts.json"
+        learned = {}
+        try:
+            learned = json.loads(learned_path.read_text(encoding="utf-8"))
+        except Exception:
+            learned = {}
+        learned[wem_id] = entry
+        try:
+            learned_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = learned_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(learned, indent=4, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(learned_path)
+        except OSError as l_e:
+            print(f"[Watch] Could not save the learned line {wem_id}: {l_e}")
+        config.intent_map[wem_id] = entry
 
     def _serve_worker():
         while True:
             wem_id, fire_dir = _fire_queue.get()
             try:
                 if wem_id not in config.intent_map:
-                    spoken = str(_csv_transcripts.get(wem_id, "")).strip()
-                    spoken_part = f' - "{spoken}"' if spoken else ""
-                    print(f"[Watch] Untracked line played: {wem_id}{spoken_part} - "
-                          f"add it to the transcript map to get it revoiced.")
-                    with _watch_lock:  # absorb the play's new atime so the scanner doesn't refire
-                        stale_file = fire_dir / f"{wem_id}.wem"
-                        if stale_file.exists():
-                            _access[wem_id] = stale_file.stat().st_atime
-                    continue
+                    row = _csv_rows.get(wem_id, {})
+                    spoken = str(row.get("Transcription", "")).strip()
+                    if row:
+                        _learn_line(wem_id, row)
+                        print(f"[Watch] Auto-learned line {wem_id} - \"{spoken}\" - it is now managed and revoiced.")
+                    else:
+                        print(f"[Watch] Untracked line played: {wem_id} - \"{spoken}\" - "
+                              f"not present in the transcript CSV; cannot learn it.")
+                        with _watch_lock:  # absorb the play's new atime so the scanner doesn't refire
+                            stale_file = fire_dir / f"{wem_id}.wem"
+                            if stale_file.exists():
+                                _access[wem_id] = stale_file.stat().st_atime
+                        continue
                 spoken = str(config.intent_map.get(wem_id, {}).get("Transcription", "")).strip()
                 spoken_part = f' - speaking: "{spoken}"' if spoken else ""
                 print(f"[Watch] {wem_id} fired{spoken_part} - fetching a fresh line...")
@@ -193,6 +331,18 @@ def watch_wems(wtray_ui, config):
     last_settings_mtime = config.settings_mtime()
     current_mod_dir = config.mod_dir
 
+    _atime_watch = _AtimeWatch()
+    _atime_watch_open = False
+    _last_safety_scan = 0.0
+
+    def _consider(wem_id, fresh_atime):
+        """Coalesced dispatch check: True when this play must be served."""
+        with _watch_lock:
+            if fresh_atime == _access.get(wem_id, 0) or wem_id in _in_flight:
+                return False
+            _in_flight.add(wem_id)  # one serve per line at a time
+            return True
+
     while wtray_ui.running:
         # Live settings: manager Apply (or hand edits) land within one watch interval, no restart needed.
         mtime = config.settings_mtime()
@@ -213,19 +363,25 @@ def watch_wems(wtray_ui, config):
                 with _watch_lock:
                     _access.clear()
                     _access.update(_scan_atimes(current_mod_dir))
+            _atime_watch_open = _atime_watch.open(current_mod_dir) if current_mod_dir else False
         if not current_mod_dir or not current_mod_dir.exists():
             time.sleep(config.check_interval)
             continue
+        if not _atime_watch_open:
+            _atime_watch_open = _atime_watch.open(current_mod_dir)
 
-        for wem_id, fresh_atime in _scan_atimes(current_mod_dir).items():
-            with _watch_lock:
-                changed = fresh_atime != _access.get(wem_id, 0)
-                if changed and wem_id not in _in_flight:
-                    _in_flight.add(wem_id)  # coalesce: one serve per line at a time
-                    dispatch = True
-                else:
-                    dispatch = False
-            if dispatch:
+        # Event-driven detection: wait() blocks (near-zero idle cpu) and returns the names the OS saw being read.
+        touched = _atime_watch.wait(max(config.check_interval, 0.25))
+        now = time.time()
+        candidates = []
+        if touched is None or now - _last_safety_scan >= 5.0:
+            candidates = list(_scan_atimes(current_mod_dir).items())
+            _last_safety_scan = now
+        for wem_id in (touched or []):
+            try:
+                candidates.append((wem_id, os.stat(current_mod_dir / f"{wem_id}.wem").st_atime))
+            except OSError:
+                pass
+        for wem_id, fresh_atime in candidates:
+            if _consider(wem_id, fresh_atime):
                 _fire_queue.put((wem_id, current_mod_dir))
-
-        time.sleep(config.check_interval)

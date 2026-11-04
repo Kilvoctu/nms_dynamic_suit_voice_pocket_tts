@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
 # Shared resolver (stdlib-only module - safe to import before deps exist)
 sys.path.insert(0, str(PROJECT_ROOT))
-from modular.path_utils import STARTER_WEMS_SUBPATH, WEM_SUBPATH, resolve_mod_root, resolve_mod_wem_dir  # noqa: E402
+from modular.path_utils import STARTER_WEMS_SUBPATH, resolve_mod_root, resolve_mod_wem_dir
 
 WAV2WEM_URL = "https://github.com/pas2k/wav2wem/releases/download/v0.1/wav2wem.exe"
 WAV2WEM_SHA256 = "5a10738a73d5451ede6a526a7aa0bfe7f42b41faffe78c9b62ec9f223f91d736"

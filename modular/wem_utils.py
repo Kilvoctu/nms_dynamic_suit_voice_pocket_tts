@@ -36,7 +36,7 @@ def convert_to_wem(config, temp_wav_path, output_path: Path):
             break
         except PermissionError:
             time.sleep(0.5 * attempt)
-        except Exception as e:
+        except Exception:
             time.sleep(0.5 * attempt)
     else:
         raise FileExistsError(f"Could not move WEM to {output_path}")

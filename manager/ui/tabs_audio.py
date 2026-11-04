@@ -2,7 +2,6 @@
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -15,7 +14,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSlider,
-    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -363,7 +361,7 @@ class AudioTab(QWidget):
         self._test_inputs = {
             "text_payload": self.test_text.toPlainText().strip(),
             "fx": self._slider_values(),
-            "voice": self.window.audition_voice() or tts_utils.POCKET_DEFAULT_VOICE,
+            "voice": self.window.audition_voice(),
         }
         self._log(" Starting background voice synthesis sequence...")
         self._test_thread = FunctionThread(self._audio_test_job, self)

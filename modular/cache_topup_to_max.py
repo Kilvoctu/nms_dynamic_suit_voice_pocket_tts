@@ -1,5 +1,4 @@
 # cache_topup_to_max.py
-from time import time
 from modular.config import SuitVoiceConfig
 from modular.quick_cache import _replacement_wrapper
 
@@ -24,7 +23,6 @@ def fill_cache_for_ids(wem_ids, max_count=None, progress=None):
     for idx, wem_id in enumerate(wem_ids, start=1):
         wem_id = str(wem_id)  # force to string
 
-        start_time = time()
         wem_dir = config.quick_cache_dir / str(wem_id)
         wem_dir.mkdir(parents=True, exist_ok=True)
 
@@ -41,7 +39,6 @@ def fill_cache_for_ids(wem_ids, max_count=None, progress=None):
             progress(idx, total_ids, wem_id, missing_count)
 
         for i in range(missing_count):
-            t0 = time()
             _replacement_wrapper(config, wem_id, wem_dir)
 
 

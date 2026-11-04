@@ -4,11 +4,10 @@ import json
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QEvent, QPoint, Qt, QTimer
-from PySide6.QtGui import QAction, QCursor, QIcon, QKeySequence, QMouseEvent, QShortcut
+from PySide6.QtCore import QByteArray, QEvent, Qt, QTimer
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QMouseEvent, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
-    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
@@ -20,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from modular.path_utils import is_pipeline_running, resolve_mod_root
+from modular.path_utils import is_pipeline_running
 from ui.pipeline_bar import _CLOSE_FORCE_AFTER_S, PipelineBar
 from ui.tabs_audio import AudioTab
 from ui.tabs_profile import ProfileTab

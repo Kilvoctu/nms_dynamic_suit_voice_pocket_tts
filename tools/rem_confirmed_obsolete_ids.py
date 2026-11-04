@@ -32,7 +32,7 @@ def total_dehydration():
             details["Used"] = "Yes"
             lean_data[id_str] = details
 
-    print(f"Purging complete!")
+    print("Purging complete!")
     print(f"Retained exactly {len(lean_data)} active tracks.")
     print(f"Nuked {len(master_data) - len(lean_data)} obsolete ghost records.")
 

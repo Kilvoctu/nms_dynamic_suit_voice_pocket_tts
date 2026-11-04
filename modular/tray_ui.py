@@ -1,10 +1,8 @@
 # tray_ui.py
-import csv
 import threading
 from pathlib import Path
 from PIL import Image, ImageDraw
 from pystray import Icon, Menu, MenuItem
-from modular.cache_topup_to_max import fill_cache_for_ids
 from modular.config import SuitVoiceConfig
 
 class TrayUI:

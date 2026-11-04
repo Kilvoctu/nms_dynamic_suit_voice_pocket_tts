@@ -4,7 +4,6 @@ import json
 import os
 import time
 from ctypes import wintypes
-from pathlib import Path
 from modular.quick_cache import (begin_sweep_wave, end_sweep_wave, get_cached_wem,
                                  move_cachedfile_to_mod_dir, update_access_time_to_match_newfile)
 from PIL import Image
@@ -322,7 +321,6 @@ def watch_wems(wtray_ui, config):
 
     # --- PHASE 4: Initialization Complete, Launch Active Watch ---
     # Restore native transparency by swapping the icon out directly
-    root_dir = Path(__file__).parent
     if wtray_ui.ready_icon_path.exists():
         # Open a fresh copy and preserve the full RGBA alpha transparency channel
         wtray_ui.icon.icon = Image.open(wtray_ui.ready_icon_path).convert("RGBA")

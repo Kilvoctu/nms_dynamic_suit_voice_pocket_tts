@@ -282,7 +282,7 @@ def end_sweep_wave():
 def _maybe_start_filler_round():
     """One filler round ('1c..35c'): a single extra variant per tracked line under
     cache depth, enqueued in line order; chained rounds grow depth one level at a time."""
-    global _filler_round_pending, _restock_config
+    global _filler_round_pending
     config = _restock_config
     if config is None:
         return

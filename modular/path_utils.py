@@ -1,7 +1,6 @@
 # modular/path_utils.py
 """Path resolution helpers. Stdlib-only so pre-setup tooling (manager gating,
 setup runner) can import this without pulling numpy/torch."""
-import json
 from pathlib import Path
 
 # The game's sub-path (game truth - never changes) and the repo's starter-wem copy.

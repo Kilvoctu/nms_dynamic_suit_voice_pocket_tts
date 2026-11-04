@@ -39,7 +39,7 @@ def main():
     # Fire up the synthesis warmup routine (downloads weights into cache/hub if missing)
     try:
         started = time.monotonic()
-        model = tts_utils.warm_all_pocket_voices(pocket_model, project_root)
+        tts_utils.warm_all_pocket_voices(pocket_model, project_root)
         print(f"[TTS] All voices warm (model '{pocket_model}') in {time.monotonic() - started:.1f}s")
 
         test_text = (

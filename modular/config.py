@@ -4,7 +4,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from llama_cpp import Llama, Optional
+from llama_cpp import Llama
 from modular import tts_utils
 from modular import prompt_presets
 from modular.prompt_utils import build_promptdata

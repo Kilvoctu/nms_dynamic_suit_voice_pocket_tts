@@ -3,7 +3,7 @@
         "Filename": "774834164.WEM",
         "Transcription": "Weather Update - Storm Clearing",
         "Category": "Local Hazards",
-        "Intent": "A storm is ending, and eeather conditions will soon return to normal in the local areal.",
+        "Intent": "A storm is ending, and weather conditions will soon return to normal in the local area.",
         "Used": "Yes"
     },
     "1032826641": {
@@ -45,7 +45,7 @@
         "Filename": "976899439.WEM",
         "Transcription": "Extreme Night Conditions Detected",
         "Category": "Extreme Conditions",
-        "Intent": "{name} has encountered extremely hazardous underground conditions during the night cycle, posing a threat to  life support and safety.",
+        "Intent": "{name} has encountered extremely hazardous conditions during the night cycle, posing a threat to life support and safety.",
         "Used": "Yes"
     },
     "570428671": {
@@ -73,7 +73,7 @@
         "Filename": "647699088.WEM",
         "Transcription": "Extreme Heat: Critical",
         "Category": "Severe Heat",
-        "Intent": "unable to cope with critical heat conditions. Continued exposure will result in total destruction of the suit, and complete carbonizaton of it's biological contents.",
+        "Intent": "unable to cope with critical heat conditions. Continued exposure will result in total destruction of the suit, and complete carbonization of its biological contents.",
         "Used": "Yes"
     },
     "980411923": {
@@ -171,7 +171,7 @@
         "Filename": "78601477.WEM",
         "Transcription": "Warning: Sentinel Walker Detected",
         "Category": "Personal Combat",
-        "Intent": "A hostile large-scale heavily armed and armoured Sentinel unit has been detected approaching {name}'s location.  It's weapons are active and it is scanning.",
+        "Intent": "A hostile large-scale heavily armed and armoured Sentinel unit has been detected approaching {name}'s location.  Its weapons are active and it is scanning.",
         "Used": "Yes"
     },
     "486861530": {
@@ -241,7 +241,7 @@
         "Filename": "797567920.WEM",
         "Transcription": "Toxic Protection Falling",
         "Category": "Toxic Hazard",
-        "Intent": "Toxic shielding is weakening; omminent direct exposure to ambient poisons.",
+        "Intent": "Toxic shielding is weakening; imminent direct exposure to ambient poisons.",
         "Used": "Yes"
     },
     "396681446": {

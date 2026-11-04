@@ -2,7 +2,8 @@
 
 Version: 2.0 (fork)<br>
 Original Author: [Bob-Harper](https://github.com/Bob-Harper)<br>
-Repository: [nms_dynamic_suit_voice](https://github.com/Bob-Harper/nms_dynamic_suit_voice)
+Repository: [nms_dynamic_suit_voice](https://github.com/Bob-Harper/nms_dynamic_suit_voice)<br>
+Fork Repository: [nms_dynamic_suit_voice_pocket_tts](https://github.com/Kilvoctu/nms_dynamic_suit_voice_pocket_tts)
 
 
 ⚠️ Tested on a handful of machines: Windows only, and it wants a decent CPU and RAM. Runs CPU-only by design, the GPU stays with the game.

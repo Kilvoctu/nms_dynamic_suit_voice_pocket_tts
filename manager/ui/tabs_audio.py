@@ -51,8 +51,8 @@ class AudioTab(QWidget):
         super().__init__()
         self.window = window
         self.effects_data = window.user_data.get("voice_effects", {})
-        self.presets_file = window.project_root / "data" / "audio_presets.json"
-        self.user_presets_file = window.project_root / "user" / "audio_presets.json"
+        self.presets_file = window.project_root / "assets" / "data" / "audio_presets.json"
+        self.user_presets_file = window.project_root / "state" / "user" / "audio_presets.json"
         self.loaded_presets = {}
         if self.presets_file.exists():
             try:
@@ -371,8 +371,8 @@ class AudioTab(QWidget):
         self._test_thread.start()
 
     def _audio_test_job(self):
-        from modular.config import SuitVoiceConfig
-        from modular import tts_utils
+        from engine.config import SuitVoiceConfig
+        from engine import tts_utils
         import numpy as np
         from scipy.io import wavfile
         from scipy.signal import resample
@@ -385,7 +385,7 @@ class AudioTab(QWidget):
         self._test_thread.emit_log(" Connecting to Pocket TTS Engine...")
         heavy_cfg = SuitVoiceConfig(init_llm=False)
 
-        cache_dir = self.window.project_root / "cache"
+        cache_dir = self.window.project_root / "state" / "cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
         temp_wav = cache_dir / "sandbox_raw.wav"
         final_wav = cache_dir / "sandbox_processed.wav"
@@ -425,7 +425,7 @@ class AudioTab(QWidget):
         ], check=True, creationflags=_CREATE_NO_WINDOW)
 
         self._test_thread.emit_log(" Pinning loudness to game-mix levels (two-pass loudnorm)...")
-        from modular.tts_utils import apply_loudness_normalization
+        from engine.tts_utils import apply_loudness_normalization
         target = float(heavy_cfg.voice_effects.get("loudness_target", -5.0))
         true_peak = float(heavy_cfg.voice_effects.get("loudness_true_peak", 5.0))
         apply_loudness_normalization(ffmpeg_bin, temp_wav, target, _CREATE_NO_WINDOW, true_peak=true_peak)

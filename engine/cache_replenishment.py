@@ -1,10 +1,10 @@
 import time
 from pathlib import Path
 from datetime import datetime
-from modular.llm_utils import reword_phrase
-from modular.prompt_utils import build_suit_prompt
-from modular.tts_utils import run_tts
-from modular.wem_utils import convert_to_wem
+from engine.llm_utils import reword_phrase
+from engine.prompt_utils import build_suit_prompt
+from engine.tts_utils import run_tts
+from engine.wem_utils import convert_to_wem
 
 
 def rephrase_replacement_line(config, wem_id, rephrase: bool = True) -> str:
@@ -46,7 +46,7 @@ def render_replacement_line(config, wem_id, output_path: Path, reworded: str) ->
     else:
         # Voice+settings-tagged: lets quick_cache serve only variants from the
         # current voice/phrasing era and purge stale ones automatically.
-        from modular.quick_cache import _settings_fingerprint, _voice_tag
+        from engine.quick_cache import _settings_fingerprint, _voice_tag
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         tag = f"{_voice_tag(config.tts_voice)}_{_settings_fingerprint(config)}"
         final_wem_path = output_path / f"{wem_id}_{tag}_{timestamp}.wem"

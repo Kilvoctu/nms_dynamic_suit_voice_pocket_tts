@@ -11,8 +11,8 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton
 
-from modular import pipeline_status
-from modular.path_utils import is_pipeline_running
+from engine import pipeline_status
+from engine.path_utils import is_pipeline_running
 
 _STOP_FORCE_AFTER_S = 20  # graceful window before offering a force kill
 _CLOSE_FORCE_AFTER_S = 15  # shorter patience when the user is closing the app
@@ -129,7 +129,7 @@ class PipelineBar(QFrame):
         """Pending background generation count from the engine's sidecar (pid-checked:
         a file left by a previous engine process reads as 0, never fake activity)."""
         try:
-            path = Path(self.window.project_root) / "cache" / "pipeline_queue.json"
+            path = Path(self.window.project_root) / "state" / "cache" / "pipeline_queue.json"
             entry = json.loads(path.read_text(encoding="utf-8"))
             if int(entry.get("pid", -1)) != int(status.get("pid", -2)):
                 return 0
@@ -143,7 +143,7 @@ class PipelineBar(QFrame):
         self._depth_checked = time.time()
         text = ""
         try:
-            cache_dir = Path(self.window.project_root) / "cache" / "tmp_quick_dir"
+            cache_dir = Path(self.window.project_root) / "state" / "cache" / "tmp_quick_dir"
             counts = [len(list(d.glob("*.wem"))) for d in cache_dir.iterdir() if d.is_dir()]
             target = int(self.window.env_data.get("runtime", {}).get("quick_cache_max", 16))
             if counts:
@@ -213,7 +213,7 @@ class PipelineBar(QFrame):
         if self.window.setup_pending or is_pipeline_running():
             return
         pipeline_status.clear_stop(self.window.project_root)
-        log_path = self.window.project_root / "cache" / "pipeline.log"
+        log_path = self.window.project_root / "state" / "cache" / "pipeline.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             if log_path.exists() and log_path.stat().st_size > 5_000_000:
@@ -229,7 +229,7 @@ class PipelineBar(QFrame):
         interpreter = str(engine_exe if engine_exe.is_file() else sys.executable)
         try:
             self._process = subprocess.Popen(
-                [interpreter, str(self.window.project_root / "launch_nms_dsv.py"), "--managed"],
+                [interpreter, str(self.window.project_root / "main.py"), "--managed"],
                 cwd=str(self.window.project_root),
                 stdout=self._log_handle,
                 stderr=subprocess.STDOUT,

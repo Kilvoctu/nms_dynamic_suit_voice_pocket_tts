@@ -1,6 +1,6 @@
 # cache_topup_to_max.py
-from modular.config import SuitVoiceConfig
-from modular.quick_cache import _replacement_wrapper
+from engine.config import SuitVoiceConfig
+from engine.quick_cache import _replacement_wrapper
 
 config = SuitVoiceConfig()
 

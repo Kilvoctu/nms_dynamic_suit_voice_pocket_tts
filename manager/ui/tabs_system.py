@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from manager.setup_runner import SetupRunner
-from modular.path_utils import is_pipeline_running, purge_cache_audio, resolve_mod_root, resolve_mod_wem_dir
+from engine.path_utils import is_pipeline_running, purge_cache_audio, resolve_mod_root, resolve_mod_wem_dir
 
 
 class SystemTab(QWidget):
@@ -106,7 +106,7 @@ class SystemTab(QWidget):
         stored = (self.window.user_data.get("paths", {}).get("mod_dir")
                   or self.window.env_data.get("paths", {}).get("mod_dir", ""))
         # Display the SIMPLE mod root; the deep ENGLISH(US) watch path is resolved
-        # at consumption time by modular.path_utils.
+        # at consumption time by engine.path_utils.
         display = str(resolve_mod_root(stored)) if stored else ""
         self.mod_dir_edit = QLineEdit(display)
         self.mod_dir_edit.setPlaceholderText(
@@ -286,7 +286,7 @@ class SystemTab(QWidget):
     # ----------------------------------------------------- pipeline settings
     def _tail_pipeline_log(self):
         """Append new lines from cache/pipeline.log to the on-screen console."""
-        path = self.window.project_root / "cache" / "pipeline.log"
+        path = self.window.project_root / "state" / "cache" / "pipeline.log"
         try:
             if not path.exists():
                 self._log_offset = 0
@@ -309,7 +309,7 @@ class SystemTab(QWidget):
             pass
 
     def _open_pipeline_log(self):
-        log_path = self.window.project_root / "cache" / "pipeline.log"
+        log_path = self.window.project_root / "state" / "cache" / "pipeline.log"
         try:
             if not log_path.exists():
                 log_path.parent.mkdir(parents=True, exist_ok=True)

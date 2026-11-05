@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from modular.path_utils import is_pipeline_running
+from engine.path_utils import is_pipeline_running
 from ui.pipeline_bar import _CLOSE_FORCE_AFTER_S, PipelineBar
 from ui.tabs_audio import AudioTab
 from ui.tabs_profile import ProfileTab
@@ -71,8 +71,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.project_root = Path(__file__).parent.parent.parent
-        self.env_config_file = self.project_root / "config" / "environment_config.json"
-        self.user_config_file = self.project_root / "user" / "user_customization.json"
+        self.env_config_file = self.project_root / "assets" / "config" / "environment_config.json"
+        self.user_config_file = self.project_root / "state" / "user" / "user_customization.json"
         self._legacy_user_config_file = self.project_root / "config" / "user_customization.json"
         # One-time migration: move the legacy tracked location into user/.
         if not self.user_config_file.exists() and self._legacy_user_config_file.exists():
@@ -173,7 +173,7 @@ class MainWindow(QMainWindow):
 
         self.available_tones = ["Standard"]
         self.available_wordiness = ["Standard"]
-        prompt_file = self.project_root / "data" / "prompt_data.json"
+        prompt_file = self.project_root / "assets" / "data" / "prompt_data.json"
         if prompt_file.exists():
             try:
                 pdata = json.loads(prompt_file.read_text(encoding="utf-8"))
@@ -243,7 +243,7 @@ class MainWindow(QMainWindow):
                 "tone": profile_tab.tone_combo.currentText(),
                 "wordiness": profile_tab.wordiness_combo.currentText(),
             }
-            from modular import prompt_presets
+            from engine import prompt_presets
 
             presets = prompt_presets.load_presets(self.project_root)
             presets[prompt_presets.BASE_ACTIVE_KEY] = (
@@ -299,7 +299,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------- window state memory
     def _ui_state_file(self) -> Path:
         """Window state lives with the rest of the user's untracked settings."""
-        new = self.project_root / "user" / "ui_state.json"
+        new = self.project_root / "state" / "user" / "ui_state.json"
         old = self.project_root / "config" / "ui_state.json"
         if not new.exists() and old.exists():
             try:  # one-time migration of pre-existing geometry/last_dirs

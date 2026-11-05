@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from modular import tts_utils
+from engine import tts_utils
 from ui.workers import FunctionThread
 
 _POCKET_TTS_TERMS_URL = "https://huggingface.co/kyutai/pocket-tts"
@@ -236,10 +236,10 @@ class VoiceModelTab(QWidget):
             return True
         if (Path.home() / ".cache" / "huggingface" / "token").is_file():
             return True
-        if (self.window.project_root / "cache" / "token").is_file():
+        if (self.window.project_root / "state" / "cache" / "token").is_file():
             return True
         model_key = self._pocket_model()
-        hub = self.window.project_root / "cache" / "hub"
+        hub = self.window.project_root / "state" / "cache" / "hub"
         return any(
             hub.glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{model_key}/*.safetensors"))
 
@@ -349,11 +349,11 @@ class VoiceModelTab(QWidget):
         if QMessageBox.question(
             self, "Confirm Deletion",
             f"Permanently delete the cloned voice '{key}' from\n"
-            f"user/pocket_voices/?\n\nThis cannot be undone.",
+            f"state/user/pocket_voices/?\n\nThis cannot be undone.",
         ) != QMessageBox.StandardButton.Yes:
             return
         try:
-            voice_folder = Path(self.window.project_root) / "user" / "pocket_voices" / key
+            voice_folder = Path(self.window.project_root) / "state" / "user" / "pocket_voices" / key
             if voice_folder.exists():
                 shutil.rmtree(voice_folder)
             self._refresh_catalog()
@@ -395,7 +395,7 @@ class VoiceModelTab(QWidget):
             self._setup_emit(f"Sign-in window exited with code {rc} (you can retry).")
         # 2. Bridge the token into the project HF cache (HF_HOME-derived token path).
         sys_tok = Path.home() / ".cache" / "huggingface" / "token"
-        loc_tok = self.window.project_root / "cache" / "token"
+        loc_tok = self.window.project_root / "state" / "cache" / "token"
         if sys_tok.is_file() and not loc_tok.exists():
             loc_tok.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(sys_tok, loc_tok)
@@ -405,7 +405,7 @@ class VoiceModelTab(QWidget):
         root = self.window.project_root
         code = (
             "import os; from pathlib import Path; "
-            f"root = Path({str(root)!r}); p = root / 'cache'; "
+            f"root = Path({str(root)!r}); p = root / 'state' / 'cache'; "
             "os.environ['HF_HOME'] = str(p); "
             "os.environ['HF_HUB_CACHE'] = str(p / 'hub'); "
             "os.environ['HUGGINGFACE_HUB_CACHE'] = str(p / 'hub'); "
@@ -481,7 +481,7 @@ class VoiceModelTab(QWidget):
             QMessageBox.critical(self, "Clone Error", f"'{name}' is a built-in voice; choose another name.")
             return
         model = self._pocket_model()
-        dest = self.window.project_root / "user" / "pocket_voices" / name / "_model_states" / f"{model}.safetensors"
+        dest = self.window.project_root / "state" / "user" / "pocket_voices" / name / "_model_states" / f"{model}.safetensors"
         if dest.exists():
             QMessageBox.critical(self, "Clone Error", f"A clone named '{name}' already exists for model {model}.")
             return
@@ -509,8 +509,8 @@ class VoiceModelTab(QWidget):
         for flag in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
             env.pop(flag, None)
         tts_utils._ensure_pocket_cache_env(self.window.project_root)
-        env.setdefault("HF_HOME", str(self.window.project_root / "cache"))
-        hub_dir = self.window.project_root / "cache" / "hub"
+        env.setdefault("HF_HOME", str(self.window.project_root / "state" / "cache"))
+        hub_dir = self.window.project_root / "state" / "cache" / "hub"
         env.setdefault("HF_HUB_CACHE", str(hub_dir))
         env.setdefault("HUGGINGFACE_HUB_CACHE", str(hub_dir))
         if not env.get("HF_TOKEN"):

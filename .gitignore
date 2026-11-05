@@ -1,44 +1,37 @@
 sound2wem/*
 venv/
 .idea/
+.ruff_cache/
 *.DS_Store
 __pycache__/
 *.pyc
 *.log
-/cache/tmp_wav_dir/*
-/cache/tmp_quick_dir/*
 desktop.ini
-cache/
 *.md
 !README.md
 
-# Ignore USER CUSTOMIZED FILE, THIS MAY NEVER BE OVERWRITTEN BY UPDATES.
-# Installer will create an empty config as needed.
-config/user_customization.json
-
-# Personal user data (settings, cloned voices) - structure tracked, contents not.
-user/*
-!user/.gitkeep
-!user/pocket_voices
-user/pocket_voices/*
-!user/pocket_voices/.gitkeep
+# Runtime state: engine cache and personal user data (structure tracked where
+# noted, contents never overwritten by updates).
+state/cache/
+state/user/*
+!state/user/.gitkeep
+!state/user/pocket_voices
+state/user/pocket_voices/*
+!state/user/pocket_voices/.gitkeep
 
 # Ignore all archived and stored material.
 archived/
 extras_put_in_mods_folder/
 
-# Ignore all model-related stuff
-
-# Ignore downloaded external tool binaries (fetched by setup); the folder also
-# hosts tracked maintenance scripts, so only the binaries are excluded.
-/tools/*.exe
+# Downloaded external tool binaries (fetched by setup into bin/).
+/state/bin/*.exe
 
 # But keep icons/images
 !assets/**/*.png
 !assets/**/*.ico
 
-cache/sandbox_raw.wav
-cache/sandbox_processed.wav
+state/cache/sandbox_raw.wav
+state/cache/sandbox_processed.wav
 
 nms_dsv_manager.lock
 assets/gemma4_e2b/

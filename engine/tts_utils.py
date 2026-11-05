@@ -1,4 +1,4 @@
-# modular/tts_utils.py
+# engine/tts_utils.py
 import json
 import os
 import shutil
@@ -32,7 +32,7 @@ WEM_ENCODER_COMPENSATION_DB = 0.9
 def _repair_flattened_hf_links(project_root):
     """Rebuild HF cache symlinks that copy tools flatten into path-text files;
     unresolvable ones are dropped so the online fallback re-downloads them."""
-    hub = Path(project_root) / "cache" / "hub"
+    hub = Path(project_root) / "state" / "cache" / "hub"
     if not hub.is_dir():
         return
     for path in list(hub.rglob("*")):
@@ -73,9 +73,9 @@ def _ensure_pocket_cache_env(project_root):
     import logging
 
     project_root = Path(project_root)
-    hub_dir = project_root / "cache" / "hub"
+    hub_dir = project_root / "state" / "cache" / "hub"
     hub_dir.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("HF_HOME", str(project_root / "cache"))
+    os.environ.setdefault("HF_HOME", str(project_root / "state" / "cache"))
     os.environ.setdefault("HF_HUB_CACHE", str(hub_dir))
     os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(hub_dir))
     logging.getLogger("huggingface_hub.utils._http").setLevel(logging.ERROR)
@@ -102,7 +102,7 @@ def _offline_fallback_notice():
 
 def pocket_custom_voice_state_path(project_root, voice: str, model_name: str):
     """Saved state file of a custom cloned voice, or None when absent."""
-    folder = Path(project_root) / "user" / "pocket_voices" / voice
+    folder = Path(project_root) / "state" / "user" / "pocket_voices" / voice
     state = folder / POCKET_STATE_DIRNAME / f"{model_name}.safetensors"
     if folder.is_dir() and state.is_file():
         return state
@@ -113,7 +113,7 @@ def list_pocket_voices(project_root, model_name: str = POCKET_DEFAULT_MODEL) -> 
     """Predefined voices plus custom cloned voices that have a usable saved state."""
     _ensure_pocket_cache_env(project_root)
     voices = list(POCKET_VOICE_GENDERS["Male"] + POCKET_VOICE_GENDERS["Female"])
-    voices_dir = Path(project_root) / "user" / "pocket_voices"
+    voices_dir = Path(project_root) / "state" / "user" / "pocket_voices"
     if voices_dir.is_dir():
         for subfolder in sorted(voices_dir.iterdir()):
             if subfolder.is_dir() and subfolder.name not in voices:
@@ -284,7 +284,7 @@ def _resolve_ffmpeg() -> str:
     found = shutil.which("ffmpeg")
     if found:
         return found
-    local = Path(__file__).parent.parent / "tools" / "ffmpeg.exe"
+    local = Path(__file__).parent.parent / "state" / "bin" / "ffmpeg.exe"
     if local.is_file():
         return str(local)
     return "ffmpeg"  # fall through: subprocess will raise a clear error

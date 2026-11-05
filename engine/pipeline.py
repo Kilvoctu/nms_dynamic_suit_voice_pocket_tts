@@ -1,11 +1,12 @@
-# nms_dynamic_suit_voice_pipeline.py (Streamlined Version)
+# engine/pipeline.py (the core watch/render loop)
 import ctypes
 import json
 import os
 import time
 from ctypes import wintypes
-from modular.quick_cache import (begin_sweep_wave, end_sweep_wave, get_cached_wem,
+from engine.quick_cache import (begin_sweep_wave, end_sweep_wave, get_cached_wem,
                                  move_cachedfile_to_mod_dir, update_access_time_to_match_newfile)
+from engine.oplock_watch import OplockWatch
 from PIL import Image
 # NOTE: No global config or TTS instantiations live at the top of this file anymore!
 
@@ -127,7 +128,7 @@ def watch_wems(wtray_ui, config):
     # --- PHASE 1: Initialize Pocket TTS Engine Weights ---
     wtray_ui.icon.title = "Dynamic Suit Voice - Loading TTS Voice Models..."
 
-    from modular.tts_utils import warm_pocket_engine
+    from engine.tts_utils import warm_pocket_engine
     config.tts_model = warm_pocket_engine(config.pocket_model_name, config.root_dir, config.tts_voice)
 
     # --- PHASE 2: Initialize Llama-cpp Core Engine weights ---
@@ -144,10 +145,23 @@ def watch_wems(wtray_ui, config):
 
     access_times = _scan_atimes(mod_dir)
 
+    # Re-attach previously auto-learned lines so they are managed from boot. This must
+    # happen BEFORE the janitor starts, or the race lets it sweep learned caches as
+    # "untracked dirs" and silently erase a line's whole variant stack.
+    try:
+        learned = json.loads((config.root_dir / "state" / "user" / "learned_transcripts.json").read_text(encoding="utf-8"))
+        merged = {k: v for k, v in learned.items()
+                  if k not in config.intent_map and str(v.get("Used", "")).strip().lower() == "yes"}
+        if merged:
+            config.intent_map.update(merged)
+            print(f"[Watch] Managing {len(merged)} auto-learned line(s) from state/user/learned_transcripts.json.")
+    except Exception:
+        pass  # first run or unreadable file: nothing to merge
+
     # Cache janitor: untracked dirs, stale-era variants and old temps, in the
     # background so it never delays the boot.
     import threading
-    from modular.quick_cache import janitor_pass
+    from engine.quick_cache import janitor_pass
     threading.Thread(target=janitor_pass, args=(config,), daemon=True, name="cache-janitor").start()
 
     # Non-blocking watch: the scanner only detects plays and hands each fire to the serve
@@ -160,6 +174,10 @@ def watch_wems(wtray_ui, config):
     _fire_queue = _queue.Queue()
     _access = access_times  # shared, always touch under _watch_lock
 
+    # Oplock play detector: game plays leave no atime, USN or directory-event traces; their
+    # opens still break our level-1 oplocks, naming the exact played file.
+    _oplock = OplockWatch()
+
     # CSV rows for logging untracked plays and auto-learning (the intent map may not know the line).
     _csv_rows = {}
     try:
@@ -168,17 +186,6 @@ def watch_wems(wtray_ui, config):
             _csv_rows = {r["WEM_number"]: r for r in _csv.DictReader(_fh) if r.get("WEM_number")}
     except Exception:
         pass  # logging/learning convenience
-
-    # Re-attach previously auto-learned lines so they are managed from boot.
-    try:
-        learned = json.loads((config.root_dir / "user" / "learned_transcripts.json").read_text(encoding="utf-8"))
-        merged = {k: v for k, v in learned.items()
-                  if k not in config.intent_map and str(v.get("Used", "")).strip().lower() == "yes"}
-        if merged:
-            config.intent_map.update(merged)
-            print(f"[Watch] Managing {len(merged)} auto-learned line(s) from user/learned_transcripts.json.")
-    except Exception:
-        pass  # first run or unreadable file: nothing to merge
 
     def _learn_line(wem_id: str, row: dict):
         """Add a heard line to the user's learned-transcripts file and the live intent map."""
@@ -189,7 +196,7 @@ def watch_wems(wtray_ui, config):
             "Intent": row.get("Intent", ""),
             "Used": "Yes",
         }
-        learned_path = config.root_dir / "user" / "learned_transcripts.json"
+        learned_path = config.root_dir / "state" / "user" / "learned_transcripts.json"
         learned = {}
         try:
             learned = json.loads(learned_path.read_text(encoding="utf-8"))
@@ -234,6 +241,7 @@ def watch_wems(wtray_ui, config):
                             _access[wem_id] = stale_file.stat().st_atime
                     print(f"[Watch] {wem_id} - no variant available; leaving the current file in place.")
                 else:
+                    _oplock.suppress(wem_id)  # the coming swap breaks our own oplock
                     moved_file = move_cachedfile_to_mod_dir(config, cached_file, fire_dir, wem_id)
                     if moved_file is None:
                         # Atime stays changed: the next scan retries until the file frees up.
@@ -241,6 +249,7 @@ def watch_wems(wtray_ui, config):
                     else:
                         with _watch_lock:
                             update_access_time_to_match_newfile(moved_file, _access)
+                        _oplock.rearm(wem_id)
                         print(f"[Watch] {wem_id} - fresh line swapped in.")
             except Exception as s_e:
                 print(f"[Watch] serve error for {wem_id}: {s_e}")
@@ -272,7 +281,7 @@ def watch_wems(wtray_ui, config):
             if gen != _refresh_generation[0]:
                 return  # superseded while waiting for the previous sweep
             try:
-                from modular.quick_cache import _settings_fingerprint, load_mod_manifest
+                from engine.quick_cache import _settings_fingerprint, load_mod_manifest
 
                 fingerprint = _settings_fingerprint(config)
                 manifest = load_mod_manifest(config)
@@ -305,10 +314,12 @@ def watch_wems(wtray_ui, config):
                         cached_file = get_cached_wem(config, wem_id, top_up=True, rephrase=True, priority=10)
                         if cached_file is None:
                             continue
+                        _oplock.suppress(wem_id)  # sweep swaps must not read as plays
                         moved = move_cachedfile_to_mod_dir(config, cached_file, target_dir, wem_id)
                         if moved is not None:
                             with _watch_lock:
                                 update_access_time_to_match_newfile(moved, _access)
+                            _oplock.rearm(wem_id)
                             print(f"[VoiceFiles] {index}/{total} -> {wem_id} ({config.tts_voice})")
                 finally:
                     end_sweep_wave()
@@ -332,6 +343,33 @@ def watch_wems(wtray_ui, config):
     _atime_watch = _AtimeWatch()
     _atime_watch_open = False
     _last_safety_scan = 0.0
+
+    def _oplock_worker():
+        """Owns the oplock watcher: arms tracked lines, acks breaks fast, feeds plays."""
+        last_target, announced, recent = 0.0, False, []
+        while wtray_ui.running:
+            now = time.monotonic()
+            if now - last_target >= 10.0:
+                last_target = now
+                if current_mod_dir and current_mod_dir.exists():
+                    _oplock.set_target(current_mod_dir, tuple(config.intent_map.keys()))
+                    n_armed = _oplock.armed_count()
+                    if n_armed and not announced:
+                        announced = True
+                        print(f"[Watch] Oplock play detection armed on {n_armed} line(s).")
+            fired = _oplock.poll_ack(0.02)  # kernel-side wait: near-zero idle cpu
+            _oplock.maintain(tries=8)
+            if fired:
+                recent = [t for t in recent if now - t <= 2.0] + [now] * len(fired)
+                if len(recent) > 25:
+                    print(f"[Watch] {len(fired)} opens within 2s - game-boot wave, not plays.")
+                else:
+                    for wem_id in fired:
+                        if _consider(wem_id, 0.0):
+                            _fire_queue.put((wem_id, current_mod_dir))
+        _oplock.close()
+
+    threading.Thread(target=_oplock_worker, daemon=True, name="oplock-watch").start()
 
     def _consider(wem_id, fresh_atime):
         """Coalesced dispatch check: True when this play must be served."""

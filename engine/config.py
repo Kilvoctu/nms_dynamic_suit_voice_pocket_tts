@@ -5,10 +5,10 @@ import shutil
 import sys
 from pathlib import Path
 from llama_cpp import Llama
-from modular import tts_utils
-from modular import prompt_presets
-from modular.prompt_utils import build_promptdata
-from modular.path_utils import resolve_mod_wem_dir
+from engine import tts_utils
+from engine import prompt_presets
+from engine.prompt_utils import build_promptdata
+from engine.path_utils import resolve_mod_wem_dir
 
 def load_json(path: Path) -> dict:
     if not path.exists():
@@ -29,12 +29,26 @@ def deep_merge(base: dict, override: dict) -> dict:
             result[key] = value
     return result
 
+
+def _migrate_legacy_runtime(root_dir: Path) -> None:
+    """One-time move of pre-refactor runtime dirs (user/, cache/) into state/."""
+    state = root_dir / "state"
+    for old, new in (("user", state / "user"), ("cache", state / "cache")):
+        src = root_dir / old
+        if src.is_dir() and not new.exists():
+            try:
+                src.rename(new)
+            except OSError:
+                pass  # locked or partially migrated: next boot retries
+
+
 class SuitVoiceConfig:
     def __init__(self, init_llm: bool = True):
-        # Anchor to project root (parent of modular/)
+        # Anchor to project root (parent of engine/)
         root_dir = Path(__file__).parent.parent
         self.root_dir = root_dir
-        config_dir = root_dir / "config"
+        _migrate_legacy_runtime(root_dir)
+        config_dir = root_dir / "assets" / "config"
 
         # Load file structures
         self.environment = load_json(config_dir / "environment_config.json")
@@ -43,7 +57,7 @@ class SuitVoiceConfig:
         # Personal settings live untracked in user/; fall back to the legacy
         # config/ location so existing installs migrate on first save.
         legacy_user = config_dir / "user_customization.json"
-        self.user_customization_path = root_dir / "user" / "user_customization.json"
+        self.user_customization_path = root_dir / "state" / "user" / "user_customization.json"
         if not self.user_customization_path.is_file() and legacy_user.is_file():
             self.user_customization_path = legacy_user
         self.user_customization = load_json(self.user_customization_path)
@@ -165,11 +179,11 @@ class SuitVoiceConfig:
         # --- ML MODEL INITIALIZATIONS ---
         models = self.environment.get("models", {})
 
-        # Pocket TTS settings (engine lazy-loads on first use; see modular/tts_utils.py)
+        # Pocket TTS settings (engine lazy-loads on first use; see engine/tts_utils.py)
         self.pocket_model_name = models.get("pocket_model", tts_utils.POCKET_DEFAULT_MODEL)
         self.pocket_tts_max_tokens = int(models.get("pocket_tts_max_tokens", 100))
         self.tts_voice = self.customization.get("tts_voice", tts_utils.POCKET_DEFAULT_VOICE)
-        self.tts_model = None  # Populated by modular.tts_utils.get_pocket_model()
+        self.tts_model = None  # Populated by engine.tts_utils.get_pocket_model()
 
         # Llama Engine Setup
         self.llm_model = str(self.resolve_json_path(models.get("llm_model"), root_dir, must_exist=True))
@@ -218,7 +232,7 @@ class SuitVoiceConfig:
         """Newest mtime across the live-editable settings files (0.0 if none exist)."""
         candidates = [
             self.user_customization_path,
-            self.root_dir / "config" / "environment_config.json",
+            self.root_dir / "assets" / "config" / "environment_config.json",
             prompt_presets.presets_path(self.root_dir),
         ]
         mtimes = [p.stat().st_mtime for p in candidates if p.is_file()]
@@ -230,7 +244,7 @@ class SuitVoiceConfig:
         user = load_json(self.user_customization_path)
         self.user_customization = user
         self.customization = deep_merge(self.default_customization, user)
-        self.environment = load_json(self.root_dir / "config" / "environment_config.json")
+        self.environment = load_json(self.root_dir / "assets" / "config" / "environment_config.json")
 
         changed = []
 

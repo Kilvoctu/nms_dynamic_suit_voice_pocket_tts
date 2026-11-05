@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from modular import prompt_presets
+from engine import prompt_presets
 from ui.preset_manager import PresetManagerDialog
 
 
@@ -188,7 +188,7 @@ class ProfileTab(QWidget):
     def builtin_entry(self, section, key):
         """Return a built-in {prompt, description} entry from prompt_data.json ({} if absent)."""
         try:
-            prompt_file = self.window.project_root / "data" / "prompt_data.json"
+            prompt_file = self.window.project_root / "assets" / "data" / "prompt_data.json"
             with open(prompt_file, "r", encoding="utf-8") as f:
                 pdata = json.load(f)
             return pdata.get(section, {}).get(key, {})

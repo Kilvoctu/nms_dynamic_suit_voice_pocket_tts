@@ -39,17 +39,11 @@ REM The named manager copy (a renamed interpreter for a clear Task Manager
 REM entry) is preferred; the plain venv pythonw is the fallback.
 :handoff
 if exist "%MGREXE%" (
-    start "" "%MGREXE%" "%ROOT%manager\main.py"
+    start "" "%MGREXE%" "%ROOT%main.py"
 ) else (
-    start "" "%PYWEXE%" "%ROOT%manager\main.py"
+    start "" "%PYWEXE%" "%ROOT%main.py"
 )
 exit /b 0
-
-:error
-echo.
-echo [ERROR]: Bootstrap failed. Check your internet connection and Python install.
-pause
-exit /b 1
 
 :error
 echo.

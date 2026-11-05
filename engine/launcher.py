@@ -1,4 +1,4 @@
-# launch_nms_dsv.py
+# engine/launcher.py
 import os
 import sys
 import socket
@@ -17,7 +17,14 @@ from pathlib import Path
 from PIL import Image
 import pystray
 
-import modular.pipeline_status as pipeline_status
+import engine.pipeline_status as pipeline_status
+
+# 1ms system timer resolution: the oplock watcher's kernel waits and the watch
+# loop's sleeps otherwise quantize to ~15.6ms, tripling break-ack latency.
+import ctypes as _ctypes
+
+_winmm = _ctypes.WinDLL("winmm")
+_winmm.timeBeginPeriod(1)
 
 
 class _LineStamper:
@@ -50,7 +57,7 @@ if sys.stderr is not None:
     sys.stderr = _LineStamper(sys.stderr)
 
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).parent.parent
 MANAGED = "--managed" in sys.argv
 
 pipeline_status.clear_stop(ROOT)
@@ -119,8 +126,8 @@ class ManagedPipeline:
     def boot_pipeline_thread(self):
         print("Launcher: Managed mode active. Invoking heavy engine components...")
 
-        from modular.config import SuitVoiceConfig
-        from nms_dynamic_suit_voice_pipeline import watch_wems
+        from engine.config import SuitVoiceConfig
+        from engine.pipeline import watch_wems
 
         config = SuitVoiceConfig(init_llm=False)
         watch_wems(self, config)
@@ -184,8 +191,8 @@ class FastBootTray:
         print("Launcher: Fast boot active. Invoking heavy engine components...")
 
         # Delayed import: keeps startup fast so the icon appears immediately.
-        from modular.config import SuitVoiceConfig
-        from nms_dynamic_suit_voice_pipeline import watch_wems
+        from engine.config import SuitVoiceConfig
+        from engine.pipeline import watch_wems
 
         # Instantiate the configuration class now that the tray is already visible
         config = SuitVoiceConfig(init_llm=False)
@@ -200,6 +207,11 @@ class FastBootTray:
         self.icon.run()
 
 
-if __name__ == "__main__":
+def run():
+    """Entry used by main.py: tray pipeline normally, headless under --managed."""
     app = ManagedPipeline() if MANAGED else FastBootTray()
     app.run()
+
+
+if __name__ == "__main__":
+    run()

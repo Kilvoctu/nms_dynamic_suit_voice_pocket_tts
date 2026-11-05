@@ -3,7 +3,7 @@ import threading
 from pathlib import Path
 from PIL import Image, ImageDraw
 from pystray import Icon, Menu, MenuItem
-from modular.config import SuitVoiceConfig
+from engine.config import SuitVoiceConfig
 
 class TrayUI:
     def __init__(self, config: SuitVoiceConfig, watch_target):

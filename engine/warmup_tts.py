@@ -1,17 +1,17 @@
-# modular/warmup_tts.py
+# engine/warmup_tts.py
 import json
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from modular import tts_utils
+from engine import tts_utils
 
 
 def main():
     print("Pipeline: Starting Pocket TTS warmup (first run downloads model weights)...")
     project_root = Path(__file__).parent.parent.absolute()
-    env_config_path = project_root / "config" / "environment_config.json"
+    env_config_path = project_root / "assets" / "config" / "environment_config.json"
 
     if not env_config_path.exists():
         print(f"ERROR: Cannot warm up engine. Configuration profile missing: {env_config_path}")
@@ -25,8 +25,8 @@ def main():
     # Resolve the active voice: user customization overrides the defaults
     voice = tts_utils.POCKET_DEFAULT_VOICE
     for cfg_path in (
-        project_root / "config" / "default_customization.json",
-        project_root / "user" / "user_customization.json",
+        project_root / "assets" / "config" / "default_customization.json",
+        project_root / "state" / "user" / "user_customization.json",
         project_root / "config" / "user_customization.json",  # legacy location
     ):
         if cfg_path.exists():
@@ -47,16 +47,16 @@ def main():
             "If you are hearing this message, the models are downloaded and everything worked correctly."
         )
         audio, sr = tts_utils.pocket_generate(pocket_model, project_root, test_text, voice)
-        wav_path = project_root / "cache" / "tmp_wav_dir" / "warmup.wav"
+        wav_path = project_root / "state" / "cache" / "tmp_wav_dir" / "warmup.wav"
         wav_path.parent.mkdir(parents=True, exist_ok=True)
         tts_utils._write_wav(wav_path, audio, sr)
         print(f"TTS warmup complete. Verification test file generated safely: {wav_path}")
 
         # Best-effort end-to-end check through the wem encoder
-        wav2wem = project_root / "tools" / "wav2wem.exe"
+        wav2wem = project_root / "state" / "bin" / "wav2wem.exe"
         if wav2wem.is_file():
             import subprocess
-            wem_path = project_root / "cache" / "tmp_wem_dir" / "warmup.wem"
+            wem_path = project_root / "state" / "cache" / "tmp_wem_dir" / "warmup.wem"
             wem_path.parent.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [str(wav2wem), str(wav_path), "-o", str(wem_path)],

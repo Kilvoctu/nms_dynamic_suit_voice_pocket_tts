@@ -8,9 +8,9 @@
     },
     "paths": {
         "mod_dir": "C:/Program Files (x86)/Steam/steamapps/common/No Man's Sky/GAMEDATA/MODS",
-        "temp_wem_dir": "cache/tmp_wem_dir",
-        "temp_wav_dir": "cache/tmp_wav_dir",
-        "quick_cache_dir": "cache/tmp_quick_dir",
+        "temp_wem_dir": "state/cache/tmp_wem_dir",
+        "temp_wav_dir": "state/cache/tmp_wav_dir",
+        "quick_cache_dir": "state/cache/tmp_quick_dir",
         "icon_image": "assets/nms_dsv.png"
     },
     "runtime": {
@@ -24,9 +24,9 @@
         "pocket_tts_max_tokens": 100
     },
     "external_tools": {
-        "wav2wem_path": "tools/wav2wem.exe",
+        "wav2wem_path": "state/bin/wav2wem.exe",
         "wav2wem_quality": 6,
-        "ffmpeg_path": "tools/ffmpeg.exe"
+        "ffmpeg_path": "state/bin/ffmpeg.exe"
     },
     "model_url": {
         "gemma4_e2b": "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf"

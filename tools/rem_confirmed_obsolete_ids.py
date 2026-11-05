@@ -12,7 +12,7 @@ VERIFIED_35_IDS = {
     "486861530", "711767177", "54980060", "383184645", "236472322"
 }
 
-json_path = Path("data/nms_suit_voice_transcripts.json")
+json_path = Path("assets/data/nms_suit_voice_transcripts.json")
 
 def total_dehydration():
     if not json_path.exists():

@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
 # Shared resolver (stdlib-only module - safe to import before deps exist)
 sys.path.insert(0, str(PROJECT_ROOT))
-from modular.path_utils import STARTER_WEMS_SUBPATH, resolve_mod_root, resolve_mod_wem_dir
+from engine.path_utils import STARTER_WEMS_SUBPATH, resolve_mod_root, resolve_mod_wem_dir
 
 WAV2WEM_URL = "https://github.com/pas2k/wav2wem/releases/download/v0.1/wav2wem.exe"
 WAV2WEM_SHA256 = "5a10738a73d5451ede6a526a7aa0bfe7f42b41faffe78c9b62ec9f223f91d736"
@@ -34,19 +34,19 @@ def is_setup_complete(project_root: Path = PROJECT_ROOT) -> bool:
         return False
     if not (pr / "venv/Lib/site-packages/pocket_tts").exists():
         return False
-    if not (pr / "tools/ffmpeg.exe").is_file():
+    if not (pr / "state/bin/ffmpeg.exe").is_file():
         return False
-    if not (pr / "tools/wav2wem.exe").is_file():
+    if not (pr / "state/bin/wav2wem.exe").is_file():
         return False
     if not any((pr / "assets").glob("*/*.gguf")):
         return False
 
     try:
-        env_data = json.loads((pr / "config" / "environment_config.json").read_text(encoding="utf-8"))
+        env_data = json.loads((pr / "assets" / "config" / "environment_config.json").read_text(encoding="utf-8"))
     except Exception:
         env_data = {}
     try:
-        user_file = (pr / "user" / "user_customization.json")
+        user_file = (pr / "state" / "user" / "user_customization.json")
         if not user_file.is_file():
             user_file = pr / "config" / "user_customization.json"  # legacy location
         user_data = json.loads(user_file.read_text(encoding="utf-8"))
@@ -138,7 +138,7 @@ class SetupRunner:
             self.log("  named process copies skipped (plain pythonw will be used).")
 
     def step_ffmpeg(self):
-        ffmpeg_exe = self.project_root / "tools" / "ffmpeg.exe"
+        ffmpeg_exe = self.project_root / "state" / "bin" / "ffmpeg.exe"
         if ffmpeg_exe.is_file():
             self.log("ffmpeg already present, skipping download.")
             return
@@ -150,7 +150,7 @@ class SetupRunner:
             with zipfile.ZipFile(zip_path) as z:
                 z.extractall(extract_dir)
             bin_dir = extract_dir / FFMPEG_ZIP_BIN_DIR
-            tools_dir = self.project_root / "tools"
+            tools_dir = self.project_root / "bin"
             tools_dir.mkdir(exist_ok=True)
             for name in ("ffmpeg.exe", "ffplay.exe"):
                 shutil.copy2(bin_dir / name, tools_dir / name)
@@ -164,7 +164,7 @@ class SetupRunner:
         self.log("  ffmpeg ready.")
 
     def step_wav2wem(self):
-        exe = self.project_root / "tools" / "wav2wem.exe"
+        exe = self.project_root / "state" / "bin" / "wav2wem.exe"
         if exe.is_file():
             self.log("wav2wem encoder already present, skipping download.")
             return
@@ -182,7 +182,7 @@ class SetupRunner:
         if target.is_file() and target.stat().st_size > 10 * 1024 * 1024:
             self.log("LLM rephrasing model already present, skipping download.")
             return
-        env_file = self.project_root / "config" / "environment_config.json"
+        env_file = self.project_root / "assets" / "config" / "environment_config.json"
         try:
             env_data = json.loads(env_file.read_text(encoding="utf-8"))
             url = env_data.get("model_url", {}).get("gemma4_e2b", GEMMA_URL)
@@ -209,7 +209,7 @@ class SetupRunner:
             raise RuntimeError(f"No starter WEMs found in {starter}")
 
     def step_register_mod_dir(self):
-        user_file = self.project_root / "user" / "user_customization.json"
+        user_file = self.project_root / "state" / "user" / "user_customization.json"
         if not user_file.is_file():
             legacy = self.project_root / "config" / "user_customization.json"
             if legacy.is_file():
@@ -227,7 +227,7 @@ class SetupRunner:
     def step_warmup(self):
         self.log("Warming up the TTS engine and ALL voices (downloads per-voice assets on first run; may take a while)...")
         result = subprocess.run(
-            [self._venv_python(), "modular/warmup_tts.py"],
+            [self._venv_python(), "engine/warmup_tts.py"],
             cwd=self.project_root, capture_output=True, text=True,
             creationflags=0x08000000 if sys.platform == "win32" else 0,
         )

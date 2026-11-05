@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # them to a file so prints, tracebacks and Qt warnings stay recoverable.
 if sys.stdout is None or sys.stderr is None:
     try:
-        _stdio_log = Path(__file__).parent.parent / "cache" / "manager_stdout.log"
+        _stdio_log = Path(__file__).parent.parent / "state" / "cache" / "manager_stdout.log"
         _stdio_log.parent.mkdir(parents=True, exist_ok=True)
         sys.stdout = open(_stdio_log, "a", encoding="utf-8", buffering=1)
         sys.stderr = sys.stdout
@@ -22,7 +22,7 @@ def _fail(exc: BaseException) -> None:
     detail = traceback.format_exc()
     print(detail, file=sys.stderr)
     try:
-        log_dir = Path(__file__).parent.parent / "cache"
+        log_dir = Path(__file__).parent.parent / "state" / "cache"
         log_dir.mkdir(parents=True, exist_ok=True)
         (log_dir / "manager_crash.log").write_text(detail, encoding="utf-8")
         _boot_log(f"CRASH: {detail}")
@@ -46,7 +46,7 @@ def _fail(exc: BaseException) -> None:
 def _boot_log(message: str) -> None:
     """Append a boot milestone so a native crash still shows the last completed stage."""
     try:
-        log_dir = Path(__file__).parent.parent / "cache"
+        log_dir = Path(__file__).parent.parent / "state" / "cache"
         log_dir.mkdir(parents=True, exist_ok=True)
         with open(log_dir / "manager_boot.log", "a", encoding="utf-8") as f:
             f.write(f"{message}\n")
@@ -105,7 +105,7 @@ def _main() -> None:
         detail = "".join(traceback.format_exception(exc_type, exc, tb))
         print(detail, file=sys.stderr)
         try:
-            (Path(__file__).parent.parent / "cache" / "manager_crash.log").write_text(
+            (Path(__file__).parent.parent / "state" / "cache" / "manager_crash.log").write_text(
                 detail, encoding="utf-8"
             )
             _boot_log(f"EVENT LOOP CRASH: {exc_type.__name__}: {exc}")

@@ -9,7 +9,7 @@
 - Game path, voice, and other preferences stored in an untracked settings file that persists through updates.
 
 <p align="center">
-  <a href="preview.png"><img src="preview.png" width="700" alt="The DSV Manager: User Profile tab"></a>
+  <a href="assets/preview.png"><img src="assets/preview.png" width="700" alt="The DSV Manager: User Profile tab"></a>
 </p>
 
 Full guide: [docs/Guide.md](https://github.com/Kilvoctu/nms_dynamic_suit_voice_pocket_tts/blob/main/docs/Guide.md)

@@ -1,11 +1,11 @@
-# modular/prompt_presets.py
+# engine/prompt_presets.py
 """User-defined prompt presets (tones, verbiage, base prompt). Stdlib-only so
 both the manager UI and the pipeline config share one source of truth."""
 import json
 import os
 from pathlib import Path
 
-PRESETS_FILE = Path("user") / "prompt_presets.json"
+PRESETS_FILE = Path("state") / "user" / "prompt_presets.json"
 SECTIONS = ("tones", "wordiness")  # sections merged into the prompt engine
 BASE_SECTION = "base"  # {name: {text, description}} - full base prompt rewrites
 BASE_ACTIVE_KEY = "base_active"  # name of the active base variant ("Default" = built-in)

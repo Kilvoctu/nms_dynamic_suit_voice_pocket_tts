@@ -8,7 +8,7 @@ import threading
 import traceback
 from queue import PriorityQueue
 from pathlib import Path
-from modular.cache_replenishment import rephrase_replacement_line, render_replacement_line
+from engine.cache_replenishment import rephrase_replacement_line, render_replacement_line
 
 # Priority queues: stage 1 rephrases with the LLM, stage 2 renders TTS+WEM, on separate workers.
 # Tiers: 0 = lines the player waits on, 10 = the voice-file sweep, 20 = restock core, 30 = filler.
@@ -279,9 +279,9 @@ def end_sweep_wave():
         _sweep_wave_depth = max(0, _sweep_wave_depth - 1)
     _maybe_start_filler_round()
 
-def _maybe_start_filler_round():
-    """One filler round ('1c..35c'): a single extra variant per tracked line under
-    cache depth, enqueued in line order; chained rounds grow depth one level at a time."""
+def _maybe_start_filler_round(just_served=None):
+    """One filler round ('1c..35c'): +1 variant per tracked line under cache depth; chained rounds
+    grow depth a level at a time. just_served counts the file moving out of cache as already gone."""
     global _filler_round_pending
     config = _restock_config
     if config is None:
@@ -302,6 +302,8 @@ def _maybe_start_filler_round():
         with _jobs_lock:
             pending = _active_jobs_count.get(str(wem_id), 0)
         have = len(list(wem_dir.glob(f"{wem_id}_{prefix_base}*.wem"))) if wem_dir.is_dir() else 0
+        if wem_id == just_served and have:
+            have -= 1  # the served variant leaves the cache as soon as we return
         under = have + pending < max_depth
         if under:
             to_queue.append((wem_id, wem_dir))
@@ -333,7 +335,7 @@ def _enqueue_restock(config, wem_id, wem_dir, rephrase, inventory):
         for _ in range(core_missing):
             enqueue_job(_replacement_wrapper, config, wem_id, wem_dir, rephrase, priority=20)
     if max_depth > min(_RESTOCK_CORE, max_depth):
-        _maybe_start_filler_round()
+        _maybe_start_filler_round(just_served=wem_id)
 
 
 def get_cached_wem(config, wem_id, top_up=True, rephrase=True, priority=0):
@@ -372,8 +374,9 @@ def get_cached_wem(config, wem_id, top_up=True, rephrase=True, priority=0):
 
     if cached_files:
         if should_pre_cache and top_up:
-            # Top up to the expected net inventory without double-queuing.
-            _enqueue_restock(config, id_str, wem_dir, rephrase, current_inventory)
+            # Top up to the expected net inventory without double-queuing. The served
+            # file is about to leave the cache (moved to the mod dir), so count it gone.
+            _enqueue_restock(config, id_str, wem_dir, rephrase, current_inventory - 1)
         return cached_files[0]
 
     # FALLBACK GATE: If an inactive file is missing, enqueue ONE immediately if none are pending
@@ -396,7 +399,9 @@ def get_cached_wem(config, wem_id, top_up=True, rephrase=True, priority=0):
             if should_pre_cache and top_up:
                 with _jobs_lock:
                     latest_pending = _active_jobs_count.get(id_str, 0)
-                _enqueue_restock(config, id_str, wem_dir, rephrase, len(cached_files) + latest_pending)
+                # The served file leaves the cache right after return: count it gone.
+                _enqueue_restock(config, id_str, wem_dir, rephrase,
+                                 len(cached_files) + latest_pending - 1)
             return cached_files[0]
         with _jobs_lock:
             still_pending = _active_jobs_count.get(id_str, 0)

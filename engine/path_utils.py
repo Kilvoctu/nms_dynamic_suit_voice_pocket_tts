@@ -1,4 +1,4 @@
-# modular/path_utils.py
+# engine/path_utils.py
 """Path resolution helpers. Stdlib-only so pre-setup tooling (manager gating,
 setup runner) can import this without pulling numpy/torch."""
 from pathlib import Path
@@ -33,7 +33,7 @@ def resolve_mod_root(user_dir) -> Path:
 
 
 def is_pipeline_running() -> bool:
-    """True when the pipeline's single-instance guard socket (see launch_nms_dsv.py)
+    """True when the pipeline's single-instance guard socket (see engine/launcher.py)
     is bound - i.e. a pipeline instance is already running."""
     import socket
     try:

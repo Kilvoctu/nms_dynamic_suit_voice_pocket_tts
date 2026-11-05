@@ -1,4 +1,4 @@
-# modular/pipeline_status.py
+# engine/pipeline_status.py
 """Status/stop channel between the pipeline process and the manager UI (stdlib-only)."""
 import json
 import os
@@ -11,11 +11,11 @@ _TITLE_PREFIX = "Dynamic Suit Voice - "
 
 
 def status_path(project_root=PROJECT_ROOT) -> Path:
-    return Path(project_root) / "cache" / "pipeline_status.json"
+    return Path(project_root) / "state" / "cache" / "pipeline_status.json"
 
 
 def stop_flag_path(project_root=PROJECT_ROOT) -> Path:
-    return Path(project_root) / "cache" / "pipeline_stop.flag"
+    return Path(project_root) / "state" / "cache" / "pipeline_stop.flag"
 
 
 def write_status(project_root, state: str, detail: str = "") -> None:

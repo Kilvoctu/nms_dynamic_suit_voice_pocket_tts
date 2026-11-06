@@ -1,4 +1,4 @@
-# tools/posix_matrix.py
+# engine/posix_matrix.py
 """Matrix: which holder share modes let (a) normal replace, (b) POSIX rename,
 (c) in-place write-open succeed? Holder can also map a section like FMOD."""
 import os

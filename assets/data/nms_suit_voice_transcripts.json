@@ -59,7 +59,7 @@
         "Filename": "711767177.wem",
         "Transcription": "Civilian Freighter under attack",
         "Category": "Freighter Combat",
-        "Intent": "A civilian freighter’s shields are down. The hull is now directly exposed.",
+        "Intent": "A civilian freighter's shields are down. The hull is now directly exposed.",
         "Used": "Yes"
     },
     "330331555": {
@@ -73,7 +73,7 @@
         "Filename": "647699088.WEM",
         "Transcription": "Extreme Heat: Critical",
         "Category": "Severe Heat",
-        "Intent": "unable to cope with critical heat conditions. Continued exposure will result in total destruction of the suit, and complete carbonization of its biological contents.",
+        "Intent": "The suit is unable to cope with critical heat conditions. Continued exposure will result in total destruction of the suit, and complete carbonization of its biological contents.",
         "Used": "Yes"
     },
     "980411923": {
@@ -129,7 +129,7 @@
         "Filename": "656990144.WEM",
         "Transcription": "Extreme Sentinel Planet",
         "Category": "Personal Combat",
-        "Intent": "This planet is inhabited by Extremely hostile Sentinel robots that will attack on sight. This is a HOSTILE COMBAT SITUATION. DANGER IS EVER-PRESENT.",
+        "Intent": "This planet is inhabited by extremely hostile Sentinel robots that will attack on sight. This is a HOSTILE COMBAT SITUATION. DANGER IS EVER-PRESENT.",
         "Used": "Yes"
     },
     "240393094": {
@@ -143,14 +143,14 @@
         "Filename": "884631197.WEM",
         "Transcription": "Weapon Charge Depleted",
         "Category": "Personal Combat",
-        "Intent": "{name}'s weapon has no energy or ammunition left, the weapon needs recharging or reloading.",
+        "Intent": "{name}'s weapon has no energy or ammunition left; it needs recharging or reloading.",
         "Used": "Yes"
     },
     "386328035": {
         "Filename": "386328035.WEM",
         "Transcription": "Hostile Scan Detected",
         "Category": "Personal Combat",
-        "Intent": "A hostile source is scanning {name}. This is a threat in progress, Urgency required.",
+        "Intent": "A hostile source is scanning {name}. This is a threat in progress; urgency is required.",
         "Used": "Yes"
     },
     "236472322": {
@@ -171,7 +171,7 @@
         "Filename": "78601477.WEM",
         "Transcription": "Warning: Sentinel Walker Detected",
         "Category": "Personal Combat",
-        "Intent": "A hostile large-scale heavily armed and armoured Sentinel unit has been detected approaching {name}'s location.  Its weapons are active and it is scanning.",
+        "Intent": "A hostile large-scale heavily armed and armored Sentinel unit has been detected approaching {name}'s location. Its weapons are active and it is scanning.",
         "Used": "Yes"
     },
     "486861530": {
@@ -199,14 +199,14 @@
         "Filename": "247183138.WEM",
         "Transcription": "Thermal Protection Falling",
         "Category": "Personal Hazard Protection",
-        "Intent": "{name}'s Personal temperature shielding is failing, ability to protect against all temperature extremes is compromised.",
+        "Intent": "{name}'s personal temperature shielding is failing; the ability to protect against all temperature extremes is compromised.",
         "Used": "Yes"
     },
     "951631813": {
         "Filename": "951631813.WEM",
         "Transcription": "Temperature Levels Stabilizing",
         "Category": "Personal Hazard Protection",
-        "Intent": "The suit's Temperature regulation systems are stabilizing; conditions are now within safe limits for {name}.",
+        "Intent": "The suit's temperature regulation systems are stabilizing; conditions are now within safe limits for {name}.",
         "Used": "Yes"
     },
     "696022064": {
@@ -220,14 +220,14 @@
         "Filename": "54980060.WEM",
         "Transcription": "Radiation Protection Falling",
         "Category": "Radiation Exposure",
-        "Intent": "The suit’s radiation shielding is degrading, {name}'s survival is increasingly vulnerable.",
+        "Intent": "The suit's radiation shielding is degrading; {name}'s survival is increasingly vulnerable.",
         "Used": "Yes"
     },
     "330757140": {
         "Filename": "330757140.WEM",
         "Transcription": "Hostile Ships Defeated",
         "Category": "Starship Combat",
-        "Intent": "{name} survived a starship battle.  Well done.",
+        "Intent": "{name} survived a starship battle. Well done.",
         "Used": "Yes"
     },
     "968718536": {

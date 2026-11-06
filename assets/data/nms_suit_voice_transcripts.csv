@@ -36,10 +36,10 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 370738335.wem,Emergency damage recovery system engaged,Equipment Status,"Severe damage has been sustained by {name}'s equipment, and automated repair systems are now active.",370738335,No
 425064686.WEM,Aerial Propulsion Jet Pack Online,Equipment Status,The jetpack has passed all status checks and is fully operational. Flight control systems have been linked to the Suit subsystems.,425064686,Yes
 462791110.wem,"Welcome home, Commander",Equipment Status,{name} has arrived at a safe location.,462791110,No
-474358890.WEM,New Freighter Acquired,Equipment Status,a new freighter in poor condition has been acquired by {name}.,474358890,No
+474358890.WEM,New Freighter Acquired,Equipment Status,A new freighter in poor condition has been acquired by {name}.,474358890,No
 487034870.WEM,Internal View Selected,Equipment Status,{name}'s first-person camera view of the suit or vehicle has been engaged.,487034870,No
 496984207.WEM,Technology Offline,Equipment Status,A component of {name}'s suit or equipment has been damaged and is now offline.,496984207,No
-589305615.WEM,Shield Kinetic System Online,Equipment Status,{name} Has gained full consciousness. The suit’s protective kinetic shield subsystem has been activated.,589305615,Yes
+589305615.WEM,Shield Kinetic System Online,Equipment Status,{name} has gained full consciousness. The suit's protective kinetic shield subsystem has been activated.,589305615,Yes
 634281443.WEM,Commencing Atlas System Suit Initialization,Equipment Status,It is time for {name} to wake up.  The Atlas Suit and AI companion are initializing and running self-diagnostic processes to prepare for user integration.,634281443,Yes
 639001585.WEM,Suit Power Cells Depleted,Equipment Status,"{name}'s suit has exhausted its power reserves, rendering most functions inactive until recharged.",639001585,Yes
 757274367.WEM,Technology Installed,Equipment Status,A new technology module has been successfully installed by {name}.,757274367,Yes
@@ -51,7 +51,7 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 935180311.WEM,New Ship Now Available,Equipment Status,A new starship is available for {name} to acquire.,935180311,No
 1006934470.WEM,Multi Tool And Mining Laser Attachment Operational,Equipment Status,{name}'s multi-tool and mining laser attachment are fully operational and ready for use.,1006934470,Yes
 1037434146.WEM,External View Selected,Equipment Status,"Switched to external camera view, offering a perspective outside of {name}'s suit or current vehicle.",1037434146,No
-1038991804.WEM,New Technology Discovered,Equipment Status,a new piece of technology has been obtained. Blueprint scans are added to {name}'s personal database and may be accessed at any time for review.,1038991804,Yes
+1038991804.WEM,New Technology Discovered,Equipment Status,A new piece of technology has been obtained. Blueprint scans are added to {name}'s personal database and may be accessed at any time for review.,1038991804,Yes
 976899439.WEM,Extreme Night Conditions Detected,Extreme Conditions,"{name} has encountered extremely hazardous conditions during the night cycle, posing a threat to life support and safety.",976899439,Yes
 29330265.WEM,Extreme Water Conditions Detected,Extreme Conditions,{name}'s exposure to extreme water conditions while immersed may lead to impaired functionality and bodily harm.,29330265,Yes
 152151960.WEM,Extreme Conditions Detected,Extreme Conditions,"Local conditions are exceeding the suit's rated safety limits, escalating the risks to {name}'s health and equipment.",152151960,Yes
@@ -60,7 +60,7 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 570428671.WEM,Extreme Conditions Detected,Extreme Conditions,"Local conditions have escalated in intensity to extremely hazardous levels, posing risks to {name}'s health and equipment.",570428671,Yes
 653680659.WEM,Extreme Subterranean Conditions Detected,Extreme Conditions,There are hazardous subterranean conditions that could compromise {name}'s life expectancy.,653680659,Yes
 733521599.WEM,Extreme Night Conditions Detected,Extreme Conditions,"Extreme night-time hazards have been detected, which may threaten {name}'s suit integrity and safety.",733521599,Yes
-711767177.wem,Civilian Freighter under attack,Freighter Combat,"A civilian freighter’s shields are down. The hull is now directly exposed.",711767177,Yes
+711767177.wem,Civilian Freighter under attack,Freighter Combat,"A civilian freighter's shields are down. The hull is now directly exposed.",711767177,Yes
 160765928.wem,Civilian freighter destroyed,Freighter Destroyed,"A civilian freighter has been destroyed by hostile pirate forces. No life signs remain. The destruction is confirmed. ",160765928,Yes
 954591441.wem,Pirate engines neutralized,Dreadnought Disabled,"The engines of a pirate Dreadnought have been disabled, leaving it unable to maneuver.",954591441,Yes
 278919221.wem,Hyperdrive damage is critical,Dreadnought Departure,A critically damaged pirate Dreadnought is trying to start their warp engines to make an uncontrolled emergency warp jump which will risk destruction of the ship.,278919221,Yes
@@ -71,14 +71,14 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 330331555.WEM,Income Received,Increased Funds,Funds have been received.,330331555,Yes
 543874217.WEM,Danger: Heat Levels Critical,Severe Heat,"Critical heat levels have bypassed {name}'s protective systems, resulting in life-threatening high temperatures.",543874217,Yes
 580370729.WEM,Extreme Heat Damage Detected,Severe Heat,"Extreme heat damage has been detected; failure to mitigate this will cause {name} severe harm, possibly fatal. ",580370729,Yes
-647699088.WEM,Extreme Heat: Critical,Severe Heat,"unable to cope with critical heat conditions. Continued exposure will result in total destruction of the suit, and complete carbonization of its biological contents.",647699088,Yes
-303147008.WEM,Funds Depleted,Insufficient Funds,"no Funds available, current balance is zero.",303147008,Yes
-911201958.WEM,Insufficient Funds,Insufficient Funds,The amount of Funds on hand are insufficient for {name} to complete the requested purchase.,911201958,Yes
+647699088.WEM,Extreme Heat: Critical,Severe Heat,"The suit is unable to cope with critical heat conditions. Continued exposure will result in total destruction of the suit, and complete carbonization of its biological contents.",647699088,Yes
+303147008.WEM,Funds Depleted,Insufficient Funds,"All funds are spent; the current balance is zero.",303147008,Yes
+911201958.WEM,Insufficient Funds,Insufficient Funds,The amount of funds on hand is insufficient for {name} to complete the requested purchase.,911201958,Yes
 980411923.WEM,Product Received,Item Inventory,A product or item has been delivered and added to inventory.,980411923,Yes
 780959188.WEM,Inventory Full,Item Inventory,"The inventory space is completely full, preventing additional item storage. ",780959188,Yes
 383184645.WEM,Inventory Full,Item Inventory,"The inventory space is completely full, preventing additional item storage. ",383184645,Yes
 1023688906.WEM,Collectible Received,Item Inventory,A single item intended for personal decoration has been added to inventory.,1023688906,Yes
-159011641.WEM,Transferred,Item Inventory,An inventory item has been moved from slot or container to another slot or container.,159011641,No
+159011641.WEM,Transferred,Item Inventory,An inventory item has been moved from one slot or container to another slot or container.,159011641,No
 200893742.WEM,No Free Slots In Ship Inventory,Item Inventory,The ship's inventory is full. No additional items can be stored until space is cleared.,200893742,Yes
 431813574.WEM,Inventory Contents Transferred,Item Inventory,Selected inventory contents have been moved to a new storage location or compartment.,431813574,No
 665195778.WEM,New Inventory Slots Available,Item Inventory,"Additional inventory slots have been installed in the suit, increasing carrying capacity.",665195778,No
@@ -109,12 +109,12 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 756031301.WEM,Enemy Missile Incoming,Missile Launch,"A hostile missile has been launched at a civilian freighter.",756031301,Yes
 126319994.WEM,Secure Transmission Module Located,Navigation,A communications module has been found and its data is being downloaded to {name}'s navigation system.,126319994,Yes
 243520476.WEM,Orbital Station Coordinates Received,Navigation,New coordinates for a previously unvisited orbital station have been uploaded to {name}'s navigation system.,243520476,Yes
-288672024.WEM,Distress Signal Detected,Navigation,navigation computer has detected and traced a distress signal from another entity. Coordinates of the signal’s origin have been added to {name}'s navigation database for potential response.,288672024,Yes
+288672024.WEM,Distress Signal Detected,Navigation,navigation computer has detected and traced a distress signal from another entity. Coordinates of the signal's origin have been added to {name}'s navigation database for potential response.,288672024,Yes
 334124591.WEM,Base Out Of Range,Navigation,{name} is outside the legally claimed region boundaries of the current base. Outside the base there are only a handful of small portable items available to be constructed and placed.,334124591,No
 436192208.WEM,Starship Signal Detected,Navigation,"A signal has been detected that may be of interest, it appears to match a standard starship distress frequency. Navigation coordinates are marked for {name} to investigate.",436192208,Yes
 545382948.WEM,Sigil Trait Module Located,Navigation,"A rare upgrade module relevant to Sigil Traits has been found, it awaits interaction.",545382948,No
-705081998.wem,Anomaly detected,Navigation,There is an unusual phenomenon detected nearby that {name}'s may find worth investigating.,705081998,No
-906001973.WEM,Jumping,Navigation,"The hyperspace jump is currently underway. Unpleasant physical sensations such as dizziness or nausea as a result of visual or sensory distortions is absolutely normal, but it may be difficult to resist succumbing to the effects.",906001973,No
+705081998.wem,Anomaly detected,Navigation,There is an unusual phenomenon nearby that {name} may find worth investigating.,705081998,No
+906001973.WEM,Jumping,Navigation,"The hyperspace jump is currently underway. Unpleasant physical sensations such as dizziness or nausea as a result of visual or sensory distortions are absolutely normal, but it may be difficult to resist succumbing to the effects.",906001973,No
 906332741.WEM,Alert: Navigational Data Received,Navigation,New navigational data has been received and stored in navigation database.,906332741,Yes
 965460983.WEM,Out Of Range: Return To Base,Navigation,{name} is outside of the current base's functional area. Most construction opportunities are disabled outside the base boundary.,965460983,No
 64910055.WEM,Warning,Notification,{name} is acting irrationally or unsustainably.,64910055,Yes
@@ -126,39 +126,39 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 582370014.WEM,Assistant Recruited,Notification,A new recruit has joined {name}'s journey.,582370014,No
 599588736.WEM,Warning,Notification,{name}'s actions may attract unwelcome attention from local authorities.,599588736,Yes
 811360087.WEM,New Assistant Recruited,Notification,A new intern has been recruited to assist {name}.,811360087,No
-1003218333.WEM,Warning,Notification,Recommend {name}'s reviewal of immediate surroundings for possible threats.,1003218333,Yes
+1003218333.WEM,Warning,Notification,Recommend that {name} review immediate surroundings for possible threats.,1003218333,Yes
 1015651622.WEM,Warning,Notification,{name}'s current behavior may hinder progress or cause problems.,1015651622,Yes
 228408571.WEM,Warning,Notification,{name} should consider disengaging and retreating from the current situation for safety or strategic advantage.,228408571,Yes
 512212065.WEM,Oxygen Levels Critical,Oxygen Level,"{name}'s oxygen supply is nearly depleted, with a corresponding immediate risk of suffocation. ",512212065,Yes
 768295468.WEM,Danger: Low Oxygen Levels,Oxygen Level,{name}'s suit is nearly depleted of breathable oxygen.,768295468,Yes
-656990144.WEM,Extreme Sentinel Planet,Personal Combat,This planet is inhabited by Extremely hostile Sentinel robots that will attack on sight. This is a HOSTILE COMBAT SITUATION. DANGER IS EVER-PRESENT.,656990144,Yes
+656990144.WEM,Extreme Sentinel Planet,Personal Combat,This planet is inhabited by extremely hostile Sentinel robots that will attack on sight. This is a HOSTILE COMBAT SITUATION. DANGER IS EVER-PRESENT.,656990144,Yes
 240393094.WEM,Warning: Sentinel Drones Activated,Personal Combat,Multiple hostile drones are converging on {name}'s position.,240393094,Yes
-884631197.WEM,Weapon Charge Depleted,Personal Combat,"{name}'s device has no energy or ammunition left, the tool needs recharging or reloading.",884631197,Yes
-386328035.WEM,Hostile Scan Detected,Personal Combat,"A hostile source is scanning {name}. This is a threat in progress, Urgency required.",386328035,Yes
+884631197.WEM,Weapon Charge Depleted,Personal Combat,"{name}'s weapon has no energy or ammunition left; it needs recharging or reloading.",884631197,Yes
+386328035.WEM,Hostile Scan Detected,Personal Combat,"A hostile source is scanning {name}. This is a threat in progress; urgency is required.",386328035,Yes
 236472322.WEM,Warning: Sentinel Combat Unit Deployed,Personal Combat,An advanced Sentinel enemy unit is hunting {name} due to recent actions.,236472322,Yes
 583871976.WEM,Warning: Threat Detected,Personal Combat,There is a nearby danger or enemy presence that may threaten {name}'s safety.,583871976,Yes
 72116738.wem,Sentinels Arrived,Personal Combat,Sentinel enemy units have reached the current location and are preparing to attack {name}.,72116738,Yes
-78601477.WEM,Warning: Sentinel Walker Detected,Personal Combat,A hostile large-scale heavily armed and armoured Sentinel unit has been detected approaching {name}'s location.  Its weapons are active and it is scanning.,78601477,Yes
+78601477.WEM,Warning: Sentinel Walker Detected,Personal Combat,A hostile large-scale heavily armed and armored Sentinel unit has been detected approaching {name}'s location. Its weapons are active and it is scanning.,78601477,Yes
 90482995.WEM,Hostiles Approaching,Personal Combat,Hostile forces are approaching {name} rapidly. Prepare for confrontation.,90482995,Yes
 486861530.WEM,Warning: Elite Sentinel Force,Personal Combat,"A high-level hostile Sentinel unit is approaching, seeking to engage {name} in combat.",486861530,Yes
 540684729.wem,Sentinel force deactivated,Personal Combat,Hostile Sentinel network in the area is temporarily disabled.,540684729,Yes
 673620140.WEM,Warning: Sentinels Engaged,Personal Combat,{name} is actively in combat with hostile Sentinel units.,673620140,Yes
 306112359.WEM,Damage Sustained,Personal Protection,{name} has sustained moderate physical damage.,306112359,No
 943635243.WEM,Critical Damage Taken,Personal Protection,Significant physical damage has been inflicted on {name}.,943635243,Yes
-247183138.WEM,Thermal Protection Falling,Personal Hazard Protection,"{name}'s Personal temperature shielding is failing, ability to protect against all temperature extremes is compromised.",247183138,Yes
+247183138.WEM,Thermal Protection Falling,Personal Hazard Protection,"{name}'s personal temperature shielding is failing; the ability to protect against all temperature extremes is compromised.",247183138,Yes
 899320928.WEM,Thermal Protection Offline,Personal Hazard Protection,Thermal regulation systems have failed; further exposure to extreme temperatures will negatively affect {name}'s health.,899320928,Yes
-951631813.WEM,Temperature Levels Stabilizing,Personal Hazard Protection,"The suit's Temperature regulation systems are stabilizing; conditions are now within safe limits for {name}.",951631813,Yes
+951631813.WEM,Temperature Levels Stabilizing,Personal Hazard Protection,"The suit's temperature regulation systems are stabilizing; conditions are now within safe limits for {name}.",951631813,Yes
 28697689.WEM,Radiation Damage Detected,Radiation Exposure,Detected exposure to dangerous radiation levels that may severely impact {name}'s long term health.,28697689,Yes
 124237937.WEM,Extreme Night Radiation Detected,Radiation Exposure,Detection systems have registered extreme radiation levels during the local night cycle.,124237937,Yes
 696022064.WEM,Extreme Radiation Detected,Radiation Exposure,"Extremely high levels of radiation are detected nearby, requiring {name}'s immediate implementation of protective measures.",696022064,Yes
 824368356.WEM,Extreme Subterranean Radiation Detected,Radiation Exposure,"Extremely high subterranean radiation levels have been detected, posing severe risk to {name}'s health and equipment.",824368356,Yes
 899453751.WEM,Radiation Leak Detected,Radiation Exposure,A nearby source of intense radiation is posing a threat to {name}.,899453751,Yes
-53870591.WEM,Radiation Protection Offline,Radiation Exposure,"{name}'s suit's radiation shielding has completely failed, is now unable to mitigate the effects of radiation exposure. ",53870591,Yes
-54980060.WEM,Radiation Protection Falling,Radiation Exposure,"The suit’s radiation shielding is degrading, {name}'s survival is increasingly vulnerable.",54980060,Yes
-258814940.WEM,Radiation Levels Critical,Radiation Exposure,"Radiation exposure has reached a critical threshold, {name}'s continued exposure could prove fatal.",258814940,Yes
+53870591.WEM,Radiation Protection Offline,Radiation Exposure,"{name}'s suit radiation shielding has completely failed and is now unable to mitigate the effects of radiation exposure.",53870591,Yes
+54980060.WEM,Radiation Protection Falling,Radiation Exposure,"The suit's radiation shielding is degrading; {name}'s survival is increasingly vulnerable.",54980060,Yes
+258814940.WEM,Radiation Levels Critical,Radiation Exposure,"Radiation exposure has reached a critical threshold; {name}'s continued exposure could prove fatal.",258814940,Yes
 472945351.WEM,Radiation Protection Stabilizing,Radiation Exposure,Radiation protection is returning to normal operational levels.,472945351,Yes
 957514183.WEM,Danger: Radiation Breach,Radiation Exposure,"Radiation shielding has overloaded and failed, increasing risk of irreversible loss of {name}'s biological cohesion.",957514183,Yes
-330757140.WEM,Hostile Ships Defeated,Starship Combat,{name} survived a starship battle.  Well done.,330757140,Yes
+330757140.WEM,Hostile Ships Defeated,Starship Combat,{name} survived a starship battle. Well done.,330757140,Yes
 968718536.WEM,Hostile Ships Approaching,Starship Combat,"Hostile starships are approaching, their weapons are armed and ready.",968718536,Yes
 28199458.WEM,Hostile System: Weapons Engaged,Starship Combat,"Hostile forces have already initiated combat with local defenses in the system prior to arrival, and {name}'s starship has activated combat readiness protocols.",28199458,Yes
 49616634.wem,Engaging Attack Ships,Starship Combat,Attacking starships have been marked as valid weapon targets by {name}'s combat computer.,49616634,Yes
@@ -185,16 +185,16 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 769872372.wem,Large ship proximity,Starship Movement,{name}'s starship is unable to perform the attempted action while in proximity to a large ship.,769872372,No
 824079454.wem,Space station proximity,Starship Movement,{name}'s starship is unable to perform the attempted action while too close to a space station.,824079454,No
 396681446.wem,Nearby toxins detected,Toxic Hazard,Hazardous toxins are damaging {name}'s suit filters.,396681446,Yes
-50465612.WEM,Extreme Subterranean Toxicity Detected,Toxic Hazard,"Concentrated Toxic substances are detected underground, capable of breaching {name}'s toxic protections.",50465612,Yes
+50465612.WEM,Extreme Subterranean Toxicity Detected,Toxic Hazard,"Concentrated toxic substances are detected underground, capable of breaching {name}'s toxic protections.",50465612,Yes
 208814791.WEM,Extreme Water Toxicity Detected,Toxic Hazard,Water toxicity levels have reached extreme danger thresholds while {name} is immersed.,208814791,Yes
 490165063.WEM,Extreme Night Toxicity Detected,Toxic Hazard,"Extremely toxic conditions have been detected during the night cycle, posing significant danger if {name} is exposed. ",490165063,Yes
-675954230.WEM,Extreme Toxicity Detected,Toxic Hazard,"a region of extreme hazardous toxicity, requiring immediate action to avoid {name}'s damage or poisoning.",675954230,Yes
-151182894.WEM,Toxic Protection Offline,Toxic Hazard,The suit can no longer protect {name}'s from toxins and severe prolonged damage is expected.,151182894,Yes
+675954230.WEM,Extreme Toxicity Detected,Toxic Hazard,"A region of extreme hazardous toxicity, requiring immediate action to avoid harm or poisoning to {name}.",675954230,Yes
+151182894.WEM,Toxic Protection Offline,Toxic Hazard,The suit can no longer protect {name} from toxins and severe prolonged damage is expected.,151182894,Yes
 335483997.WEM,Toxic Protection Stabilizing,Toxic Hazard,Decontamination protocols activating; {name}'s toxic shielding is regaining function.,335483997,Yes
 498474774.WEM,Toxicity Levels Critical,Toxic Hazard,Toxic contamination has reached levels that will quickly be fatal; immediate safety action required.,498474774,Yes
 797567920.WEM,Toxic Protection Falling,Toxic Hazard,Toxic shielding is weakening; imminent direct exposure to ambient poisons.,797567920,Yes
-973658086.WEM,Danger: Toxic Rain Breach,Toxic Hazard,"Life-threatening toxic substances have breached the suit’s protective barriers, posing immediate danger to {name}'s health.",973658086,Yes
-1063828486.WEM,Toxic Damage Detected,Toxic Hazard,"Toxins detected, direct exposure may cause {name} to experience severe physical side effects.",1063828486,Yes
+973658086.WEM,Danger: Toxic Rain Breach,Toxic Hazard,"Life-threatening toxic substances have breached the suit's protective barriers, posing immediate danger to {name}'s health.",973658086,Yes
+1063828486.WEM,Toxic Damage Detected,Toxic Hazard,"Toxins detected; direct exposure may cause {name} to experience severe physical side effects.",1063828486,Yes
 548071497.WEM,Vehicle Deployed,Vehicle Readiness,{name}'s selected vehicle has been successfully deployed to the current location.,548071497,Yes
 670654758.WEM,Vehicle Acquired,Vehicle Readiness,A new vehicle or starship has been added to {name}'s collection.,670654758,No
 682649339.WEM,New Vehicle Acquired,Vehicle Readiness,A new vehicle has been added to {name}'s accessible assets.,682649339,Yes
@@ -203,7 +203,7 @@ Filename,Transcription,Category,Intent,WEM_number,Used
 531979220.WEM,Fuel Required,Vehicle Status,Vehicle fuel levels are below operational thresholds and {name} must replenish reserves to continue normal function.,531979220,Yes
 579975330.WEM,Vehicle Damage Sustained,Vehicle Status,{name}'s vehicle has taken medium damage.  Do not speculate on the source of damage.,579975330,Yes
 740830728.WEM,Refuel Vehicle,Vehicle Status,{name}'s vehicle is critically low on fuel and requires immediate refueling or recharging.,740830728,Yes
-891464212.WEM,Fuel Depleted,Vehicle Status,"vehicle fuel reserves are fully depleted, disabling {name}'s vehicle operation. ",891464212,Yes
+891464212.WEM,Fuel Depleted,Vehicle Status,"Vehicle fuel reserves are fully depleted, disabling {name}'s vehicle operation. ",891464212,Yes
 974964870.WEM,Damage Sustained To Vehicle,Vehicle Status,{name}'s vehicle has sustained light to moderate damage and the safety harness has engaged as a protective response.,974964870,No
 460766259.wem,*autophage noises*,zz_REFERENCE,"UNUSED AT THIS TIME, LEAVE WEM NUMBER BLANK",,No
 487346738.wem,*autophage noises*,zz_REFERENCE,"UNUSED AT THIS TIME, LEAVE WEM NUMBER BLANK",,No

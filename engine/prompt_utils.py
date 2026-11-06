@@ -35,7 +35,7 @@ def construct_standard_prompt(config, category, intent, phrase, wem_id):
     system_prompt = config.suit_voice_base.rstrip() + "\n\n"
     tone = determine_tone(config)
     wordiness_level = determine_wordiness(config)
-    category_context = config.promptdata.get(category, config.promptdata.get("Standard", ""))
+    category_context = config.promptdata.get(category, config.promptdata.get("Default", ""))
     wordiness_prompt = config.promptdata.get("wordiness", {}).get(wordiness_level, "")
     tone_prompt = config.promptdata.get("tones", {}).get(tone, "")
     recent_lines = retrieve_recent_lines(config, wem_id)

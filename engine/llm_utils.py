@@ -14,11 +14,11 @@ def reword_phrase(config, wem_id_r,
             output = config.llm.create_chat_completion(
                 messages=messages,
                 max_tokens=512,  # Gemma-4 answers directly (no hidden thinking); 512 caps rambling
-                temperature=0.75,
-                top_k=90,
-                top_p=0.9,
+                temperature=1.0,
+                top_p=0.95,
+                top_k=100,
                 repeat_penalty=1.25,
-                seed=-1  # must add this to randomize the results
+                seed=-1,  # must add this to randomize the results
             )
             # print(f"Raw Output:\n {output}")
             result = output["choices"][0]["message"]["content"].strip()

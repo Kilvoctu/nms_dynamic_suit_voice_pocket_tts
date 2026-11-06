@@ -145,7 +145,9 @@ class PipelineBar(QFrame):
         try:
             cache_dir = Path(self.window.project_root) / "state" / "cache" / "tmp_quick_dir"
             counts = [len(list(d.glob("*.wem"))) for d in cache_dir.iterdir() if d.is_dir()]
-            target = int(self.window.env_data.get("runtime", {}).get("quick_cache_max", 16))
+            runtime = {**self.window.env_data.get("runtime", {}),
+                       **self.window.user_data.get("runtime", {})}  # tracked defaults, untracked overrides
+            target = int(runtime.get("quick_cache_max", 16))
             if counts:
                 text = f" · {sum(counts) / len(counts):.1f}/{target} iterations pre-cached"
         except OSError:

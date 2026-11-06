@@ -73,11 +73,6 @@ class MainWindow(QMainWindow):
         self.project_root = Path(__file__).parent.parent.parent
         self.env_config_file = self.project_root / "assets" / "config" / "environment_config.json"
         self.user_config_file = self.project_root / "state" / "user" / "user_customization.json"
-        self._legacy_user_config_file = self.project_root / "config" / "user_customization.json"
-        # One-time migration: move the legacy tracked location into user/.
-        if not self.user_config_file.exists() and self._legacy_user_config_file.exists():
-            self.user_config_file.parent.mkdir(parents=True, exist_ok=True)
-            self._legacy_user_config_file.replace(self.user_config_file)
         self._threads = []
         self._resize_drag_edges = None
         self._resize_press_global = None
@@ -219,14 +214,12 @@ class MainWindow(QMainWindow):
         audio_tab = None if self.setup_pending else self.tabs.widget(1)
         voice_tab = None if self.setup_pending else self.tabs.widget(2)
 
-        # environment config: runtime + defaults only. The personal mod dir goes
-        # into the UNTRACKED user config (never into a tracked file).
+        # environment config: tracked defaults only. Personal mod dir + runtime
+        # overrides go into the UNTRACKED user config (never into a tracked file).
         if system_tab is not None:
             mod_dir = system_tab.mod_dir_edit.text().strip()
             if mod_dir:
                 self.user_data.setdefault("paths", {})["mod_dir"] = mod_dir.replace("\\", "/")
-            self.env_data.setdefault("runtime", {})["quick_cache_max"] = int(system_tab.cache_max_spin.value())
-            self.env_data.setdefault("runtime", {})["check_interval"] = float(system_tab.interval_spin.value())
         self.env_config_file.write_text(json.dumps(self.env_data, indent=4), encoding="utf-8")
 
         # user customization: paths + identity + preferences + effects + voice
@@ -236,6 +229,10 @@ class MainWindow(QMainWindow):
             mod_dir = system_tab.mod_dir_edit.text().strip()
             if mod_dir:
                 updated["paths"]["mod_dir"] = mod_dir.replace("\\", "/")
+            updated.setdefault("runtime", {})
+            updated["runtime"]["quick_cache_max"] = int(system_tab.cache_max_spin.value())
+            updated["runtime"]["serve_workers"] = int(system_tab.serve_spin.value())
+            updated["runtime"]["gen_threads"] = int(system_tab.threads_spin.value())
         updated.setdefault("tts_voice", "fantine")
         if profile_tab is not None:
             updated["player_name"] = profile_tab.name_edit.text().strip() or "Interloper"
@@ -299,14 +296,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------- window state memory
     def _ui_state_file(self) -> Path:
         """Window state lives with the rest of the user's untracked settings."""
-        new = self.project_root / "state" / "user" / "ui_state.json"
-        old = self.project_root / "config" / "ui_state.json"
-        if not new.exists() and old.exists():
-            try:  # one-time migration of pre-existing geometry/last_dirs
-                old.replace(new)
-            except Exception:
-                return old
-        return new
+        return self.project_root / "state" / "user" / "ui_state.json"
 
     def _load_window_state(self):
         """Restore the window size/position (and maximized state); default size on first run."""

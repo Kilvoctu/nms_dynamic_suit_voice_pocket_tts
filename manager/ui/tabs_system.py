@@ -6,7 +6,6 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
-    QDoubleSpinBox,
     QFileDialog,
     QFrame,
     QGroupBox,
@@ -65,6 +64,7 @@ class SystemTab(QWidget):
         right_scroll.setWidget(right_host)
         left = QVBoxLayout(left_host)
         left.setContentsMargins(0, 0, 0, 0)
+        left.setSpacing(5)  # keep the stacked groups scrollbar-free at default heights
         right = QVBoxLayout(right_host)
         right.setContentsMargins(0, 0, 0, 0)
         root_layout.addWidget(left_scroll, 5)
@@ -174,65 +174,30 @@ class SystemTab(QWidget):
         )
         log_layout.addWidget(self.pipeline_log_view)
 
-        # RIGHT PANE: hot stove burner vault --------------------------------
-        vault_group = QGroupBox(" Advanced Signal Diagnostics ")
+        # RIGHT PANE: advanced settings ------------------------------------
+        vault_group = QGroupBox(" Advanced Settings ")
         left.addWidget(vault_group, 1)
         vault_layout = QVBoxLayout(vault_group)
 
-        self.warning_text = (
-            "YOU TRULY DO NOT WANT TO DO THIS. But you cannot help but touch the hot stove burner.\n\n"
-            "Very well. To open this panel, acknowledge that YOU UNDERSTAND CHANGING THESE SETTINGS COULD CAUSE "
-            "UNINTENDED EFFECTS such as: complete mod failure, the total inability for your suit AI to tell Friend "
-            "from Foe, severe semantic hallucinations from your local neural hulls, your domestic cat refusing to "
-            "recognize you and aggressively hissing at your presence, every single left sock you own for the rest "
-            "of your days vanishing from reality, and your tongue turning a very vivid (although highly "
-            "interesting) shade of lavender.\n\n"
-            "YOU TAKE FULL RESPONSIBILITY if your operating system autonomously purchases a heavy industrial "
-            "snowblower from an online auction site and prowls the neighbourhood to chase teenagers celebrating "
-            "their graduation."
+        self.warning_label = QLabel(
+            "These values trade CPU load, disk use and voice variety against each other.\n"
+            "Defaults are recommended; changes land on Apply Changes."
         )
-        self.halloween_easter_egg = (
-            "\n\n----------------------------------------------------------\n"
-            "\u26a0\ufe0fCRITICAL WARNING:\n CONSIDER YOUR LIFE CHOICES WHILE YOU STILL CAN.\n\n"
-            "When the Cenobites arrive, they will not listen to your pleas of \n\"I did not know what would happen.\"\n\n"
-            "You clicked the box.\n\nThey will come.\n\nThey have such configurations to show you..."
-        )
-        self._vault_brief = (
-            "These settings can break the mod or make your suit say very odd things.\n"
-            "Changing them is entirely at your own risk - hover the checkbox for details."
-        )
-        self.halloween_easter_egg = (
-            "\n\n----------------------------------------------------------\n"
-            "\u26a0\ufe0fCRITICAL WARNING:\n CONSIDER YOUR LIFE CHOICES WHILE YOU STILL CAN.\n\n"
-            "When the Cenobites arrive, they will not listen to your pleas of \n\"I did not know what would happen.\"\n\n"
-            "You clicked the box.\n\nThey will come.\n\nThey have such configurations to show you..."
-        )
-        self.warning_label = QLabel(self._vault_brief)
         self.warning_label.setWordWrap(True)
         self.warning_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.warning_label.setStyleSheet("color: #F87171; font-style: italic;")
         vault_layout.addWidget(self.warning_label)
 
-        self.accept_responsibility = QCheckBox("I ACCEPT ALL RESPONSIBILITY AND TOUCH THE BURNER")
-        self.accept_responsibility.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.accept_responsibility.toggled.connect(self._toggle_stove_burner_lock)
-        lore = (
-            self.warning_text.replace("&", "&amp;").replace("<", "&lt;")
-            .replace("\n\n", "</p><p>").replace("\n", " ")
-        )
-        self.accept_responsibility.setToolTip(f"<div style='width: 360px'><p>{lore}</p></div>")
-        vault_layout.addWidget(self.accept_responsibility)
-
-        runtime = self.window.env_data.get("runtime", {})
+        runtime = {**self.window.env_data.get("runtime", {}),
+                   **self.window.user_data.get("runtime", {})}  # tracked defaults, untracked overrides
         self.cache_max_spin = QSpinBox()
         self.cache_max_spin.setRange(1, 64)
         self.cache_max_spin.setValue(int(runtime.get("quick_cache_max", 16)))
-        self.cache_max_spin.setEnabled(False)
         self.cache_max_spin.setToolTip(
             "How many alternate wordings are kept per active line.\nMore = more variety, more disk + generation time."
         )
         horizon_row = QHBoxLayout()
-        horizon_label = QLabel("Exosuit Pre-Cache Max Threshold Horizon:")
+        horizon_label = QLabel("Variants cached per line:")
         horizon_label.setWordWrap(True)
         horizon_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         # Label takes the row's width (wrapping if needed), input pins right.
@@ -241,23 +206,38 @@ class SystemTab(QWidget):
         horizon_row.addWidget(self.cache_max_spin)
         vault_layout.addLayout(horizon_row)
 
-        self.interval_spin = QDoubleSpinBox()
-        self.interval_spin.setRange(0.01, 5.0)
-        self.interval_spin.setDecimals(2)
-        self.interval_spin.setSingleStep(0.05)
-        self.interval_spin.setValue(float(runtime.get("check_interval", 0.1)))
-        self.interval_spin.setEnabled(False)
-        self.interval_spin.setToolTip(
-            "How often the pipeline scans the game folder for newly played lines.\nLeave this alone unless lines feel delayed."
+        self.serve_spin = QSpinBox()
+        self.serve_spin.setRange(1, 6)
+        self.serve_spin.setValue(max(1, int(runtime.get("serve_workers", 3))))
+        self.serve_spin.setToolTip(
+            "How many played lines can be delivered to the mod folder in parallel.\n"
+            "Takes effect on engine restart."
         )
-        interval_row = QHBoxLayout()
-        interval_label = QLabel("Filesystem Scan Pool Tick Interval (Seconds):")
-        interval_label.setWordWrap(True)
-        interval_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        interval_row.addWidget(interval_label, 1)
-        self.interval_spin.setFixedWidth(110)
-        interval_row.addWidget(self.interval_spin)
-        vault_layout.addLayout(interval_row)
+        serve_row = QHBoxLayout()
+        serve_label = QLabel("Serve workers:")
+        serve_label.setWordWrap(True)
+        serve_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        serve_row.addWidget(serve_label, 1)
+        self.serve_spin.setFixedWidth(110)
+        serve_row.addWidget(self.serve_spin)
+        vault_layout.addLayout(serve_row)
+
+        cpu_count = os.cpu_count() or 4
+        self.threads_spin = QSpinBox()
+        self.threads_spin.setRange(1, cpu_count)
+        self.threads_spin.setValue(max(1, int(runtime.get("gen_threads", min(cpu_count, 8)))))
+        self.threads_spin.setToolTip(
+            "CPU threads per generation stage (LLM rephrase + TTS render).\n"
+            "Lower leaves headroom while gaming; LLM value applies on engine restart."
+        )
+        threads_row = QHBoxLayout()
+        threads_label = QLabel("Generation CPU threads:")
+        threads_label.setWordWrap(True)
+        threads_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        threads_row.addWidget(threads_label, 1)
+        self.threads_spin.setFixedWidth(110)
+        threads_row.addWidget(self.threads_spin)
+        vault_layout.addLayout(threads_row)
         vault_layout.addStretch(1)
 
     # ------------------------------------------------------------ helpers
@@ -408,20 +388,6 @@ class SystemTab(QWidget):
             QMessageBox.information(self, "Success", f"Exosuit local audio storage purged cleanly ({purged} files)!")
         except Exception as err:
             QMessageBox.critical(self, "Purge Error", f"Could not flush file boundaries: {err}")
-
-    # -------------------------------------------------------- burner lock
-    def _toggle_stove_burner_lock(self):
-        if self.accept_responsibility.isChecked():
-            self.cache_max_spin.setEnabled(True)
-            self.interval_spin.setEnabled(True)
-            self.warning_label.setText(self.warning_text + self.halloween_easter_egg)
-            self.warning_label.setStyleSheet("color: #EF4444; font-style: italic;")
-            self._set_status("LAMENT CONFIGURATION UNLOCKED.", "#EF4444")
-        else:
-            self.cache_max_spin.setEnabled(False)
-            self.interval_spin.setEnabled(False)
-            self.warning_label.setText(self._vault_brief)
-            self.warning_label.setStyleSheet("color: #F87171; font-style: italic;")
 
 
 def _start_thread(tab, fn, finished_handler):

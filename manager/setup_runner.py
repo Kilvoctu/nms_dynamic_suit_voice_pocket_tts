@@ -47,13 +47,11 @@ def is_setup_complete(project_root: Path = PROJECT_ROOT) -> bool:
         env_data = {}
     try:
         user_file = (pr / "state" / "user" / "user_customization.json")
-        if not user_file.is_file():
-            user_file = pr / "config" / "user_customization.json"  # legacy location
         user_data = json.loads(user_file.read_text(encoding="utf-8"))
     except Exception:
         user_data = {}
     # Personal mod dir lives in the untracked user config; the env value is
-    # only the shipped default / legacy fallback.
+    # only the shipped default.
     mod_dir_setting = (user_data.get("paths", {}).get("mod_dir")
                        or env_data.get("paths", {}).get("mod_dir", ""))
     if not mod_dir_setting:
@@ -210,11 +208,7 @@ class SetupRunner:
 
     def step_register_mod_dir(self):
         user_file = self.project_root / "state" / "user" / "user_customization.json"
-        if not user_file.is_file():
-            legacy = self.project_root / "config" / "user_customization.json"
-            if legacy.is_file():
-                user_file.parent.mkdir(parents=True, exist_ok=True)
-                legacy.replace(user_file)
+        user_file.parent.mkdir(parents=True, exist_ok=True)
         try:
             user_data = json.loads(user_file.read_text(encoding="utf-8"))
         except Exception:

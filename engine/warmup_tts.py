@@ -27,7 +27,6 @@ def main():
     for cfg_path in (
         project_root / "assets" / "config" / "default_customization.json",
         project_root / "state" / "user" / "user_customization.json",
-        project_root / "config" / "user_customization.json",  # legacy location
     ):
         if cfg_path.exists():
             try:

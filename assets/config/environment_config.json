@@ -14,9 +14,10 @@
         "icon_image": "assets/nms_dsv.png"
     },
     "runtime": {
-        "check_interval": 0.1,
         "max_session_lines": 10,
-        "quick_cache_max": 16
+        "quick_cache_max": 16,
+        "serve_workers": 3,
+        "gen_threads": 8
     },
     "models": {
         "llm_model": "assets/gemma4_e2b/gemma-4-E2B-it-Q4_K_M.gguf",

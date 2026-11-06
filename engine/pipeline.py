@@ -14,7 +14,8 @@ def watch_wems(wtray_ui, config):
     # --- PHASE 1: Initialize Pocket TTS Engine Weights ---
     wtray_ui.icon.title = "Dynamic Suit Voice - Loading TTS Voice Models..."
 
-    from engine.tts_utils import warm_pocket_engine
+    from engine.tts_utils import warm_pocket_engine, set_torch_threads
+    set_torch_threads(config.gen_threads)  # before model load: torch picks the cap up at import
     config.tts_model = warm_pocket_engine(config.pocket_model_name, config.root_dir, config.tts_voice)
 
     # --- PHASE 2: Initialize Llama-cpp Core Engine weights ---
@@ -184,9 +185,8 @@ def watch_wems(wtray_ui, config):
                         _fire_queue.put((wem_id, fire_dir, False))
                 _fire_queue.task_done()
 
-    threading.Thread(target=_serve_worker, daemon=True, name="watch-serve-1").start()
-    threading.Thread(target=_serve_worker, daemon=True, name="watch-serve-2").start()
-    threading.Thread(target=_serve_worker, daemon=True, name="watch-serve-3").start()
+    for i in range(max(1, int(getattr(config, "serve_workers", 3)))):
+        threading.Thread(target=_serve_worker, daemon=True, name=f"watch-serve-{i + 1}").start()
 
     # --- PHASE 3.5: Mod folder refresh (manifest-gated; only other-era lines re-record).
     # Mid-sweep settings changes bump the generation: the running sweep aborts and restarts.
@@ -326,13 +326,15 @@ def watch_wems(wtray_ui, config):
             else:
                 if changed:
                     print(f"[Config] Applied live changes: {', '.join(changed)}")
+                    if "generation threads" in changed:
+                        set_torch_threads(config.gen_threads)  # torch cap applies live; LLM needs a restart
                     threading.Thread(target=_refresh_mod_folder, daemon=True, name="mod-folder-refresh").start()
         if config.mod_dir != current_mod_dir:
             current_mod_dir = config.mod_dir
             print(f"[Config] Watch folder is now: {current_mod_dir}")
         if not current_mod_dir or not current_mod_dir.exists():
-            time.sleep(max(config.check_interval, 0.25))
+            time.sleep(0.5)
             continue
 
         # Play detection lives on the oplock thread; this loop only keeps settings/dir state fresh.
-        time.sleep(max(config.check_interval, 0.25))
+        time.sleep(0.5)

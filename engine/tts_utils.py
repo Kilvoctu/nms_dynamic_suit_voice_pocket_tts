@@ -29,6 +29,21 @@ POCKET_DEFAULT_VOICE = "fantine"
 # Measured: wav2wem's oggenc2 stage costs ~0.9 dB integrated LUFS on float input.
 WEM_ENCODER_COMPENSATION_DB = 0.9
 
+_torch_threads = 0  # generation CPU cap for torch renders; 0 = torch default (all cores)
+
+
+def set_torch_threads(n):
+    """Cap torch CPU threads used by TTS renders; applies live if torch is already loaded."""
+    global _torch_threads
+    _torch_threads = max(1, int(n))
+    torch = sys.modules.get("torch")
+    if torch is not None:
+        try:
+            torch.set_num_threads(_torch_threads)
+        except Exception:
+            print("[TTS] torch thread cap not applied this moment.")
+
+
 def _repair_flattened_hf_links(project_root):
     """Rebuild HF cache symlinks that copy tools flatten into path-text files;
     unresolvable ones are dropped so the online fallback re-downloads them."""
@@ -137,6 +152,9 @@ def get_pocket_model(model_name: str = POCKET_DEFAULT_MODEL, project_root="."):
                 print(f"[TTS] Cache link check skipped: {r_e}")
             # Imported here so importing this module never pulls in torch.
             from pocket_tts import TTSModel
+            if _torch_threads:
+                import torch
+                torch.set_num_threads(_torch_threads)
 
             print(f"[TTS] Loading Pocket TTS model '{model_name}' (offline)...")
             started = time.monotonic()

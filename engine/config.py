@@ -30,36 +30,18 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def _migrate_legacy_runtime(root_dir: Path) -> None:
-    """One-time move of pre-refactor runtime dirs (user/, cache/) into state/."""
-    state = root_dir / "state"
-    for old, new in (("user", state / "user"), ("cache", state / "cache")):
-        src = root_dir / old
-        if src.is_dir() and not new.exists():
-            try:
-                src.rename(new)
-            except OSError:
-                pass  # locked or partially migrated: next boot retries
-
-
 class SuitVoiceConfig:
     def __init__(self, init_llm: bool = True):
         # Anchor to project root (parent of engine/)
         root_dir = Path(__file__).parent.parent
         self.root_dir = root_dir
-        _migrate_legacy_runtime(root_dir)
         config_dir = root_dir / "assets" / "config"
 
         # Load file structures
         self.environment = load_json(config_dir / "environment_config.json")
         self.llm_prompting = load_json(config_dir / "llm_prompting.json")
         self.default_customization = load_json(config_dir / "default_customization.json")
-        # Personal settings live untracked in user/; fall back to the legacy
-        # config/ location so existing installs migrate on first save.
-        legacy_user = config_dir / "user_customization.json"
         self.user_customization_path = root_dir / "state" / "user" / "user_customization.json"
-        if not self.user_customization_path.is_file() and legacy_user.is_file():
-            self.user_customization_path = legacy_user
         self.user_customization = load_json(self.user_customization_path)
 
         # Merge defaults with custom user tweaks cleanly
@@ -68,11 +50,13 @@ class SuitVoiceConfig:
             self.user_customization
         )
 
-        # --- RUNTIME SETTINGS ---
-        runtime = self.environment.get("runtime", {})
-        self.check_interval = float(runtime.get("check_interval", 0.1))
+        # --- RUNTIME SETTINGS (tracked defaults + untracked user overrides) ---
+        runtime = {**self.environment.get("runtime", {}),
+                   **self.user_customization.get("runtime", {})}
         self.max_session_lines = int(runtime.get("max_session_lines", 10))
         self.quick_cache_max = int(runtime.get("quick_cache_max", 16))
+        self.serve_workers = max(1, int(runtime.get("serve_workers", 3)))
+        self.gen_threads = max(1, int(runtime.get("gen_threads", min(os.cpu_count() or 4, 8))))
 
         # ====================================================
         # CORE FILESYSTEM PATHS (user config first; env config holds shipped defaults)
@@ -197,7 +181,7 @@ class SuitVoiceConfig:
             model_path=self.llm_model,
             n_ctx=40960,
             n_batch=1024,
-            n_threads=min(os.cpu_count() or 4, 8),  # guard the hardware footprint
+            n_threads=self.gen_threads,  # per-stage CPU cap; torch cap set in tts_utils
             verbose=False,
             flash_attn=True,  # supported by Gemma's architecture; removes V-cache padding
         )
@@ -249,10 +233,13 @@ class SuitVoiceConfig:
             if old != new:
                 changed.append(name)
 
-        runtime = self.environment.get("runtime", {})
-        new_interval = float(runtime.get("check_interval", 0.1))
-        _track("check interval", self.check_interval, new_interval)
-        self.check_interval = new_interval
+        runtime = {**self.environment.get("runtime", {}), **user.get("runtime", {})}
+        new_workers = max(1, int(runtime.get("serve_workers", 3)))
+        _track("serve workers", self.serve_workers, new_workers)
+        self.serve_workers = new_workers
+        new_threads = max(1, int(runtime.get("gen_threads", min(os.cpu_count() or 4, 8))))
+        _track("generation threads", self.gen_threads, new_threads)
+        self.gen_threads = new_threads
         new_cache_max = int(runtime.get("quick_cache_max", 16))
         _track("cache size", self.quick_cache_max, new_cache_max)
         self.quick_cache_max = new_cache_max

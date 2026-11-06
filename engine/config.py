@@ -1,4 +1,5 @@
 # config.py
+import copy
 import json
 import os
 import shutil
@@ -8,7 +9,85 @@ from llama_cpp import Llama
 from engine import tts_utils
 from engine import prompt_presets
 from engine.prompt_utils import build_promptdata
-from engine.path_utils import resolve_mod_wem_dir
+from engine.path_utils import (
+    DEFAULT_LLM_VARIANT,
+    active_llm_variant,
+    llm_variant_gguf,
+    resolve_mod_wem_dir,
+)
+
+ENVIRONMENT_DEFAULTS = {
+    "paths": {
+        "mod_dir": "C:/Program Files (x86)/Steam/steamapps/common/No Man's Sky/GAMEDATA/MODS",
+        "temp_wem_dir": "state/cache/tmp_wem_dir",
+        "temp_wav_dir": "state/cache/tmp_wav_dir",
+        "quick_cache_dir": "state/cache/tmp_quick_dir",
+        "icon_image": "assets/nms_dsv.png",
+    },
+    "runtime": {
+        "autostart_pipeline": True,
+        "max_session_lines": 10,
+        "quick_cache_max": 8,
+        "serve_workers": 3,
+        "gen_threads": 8,
+    },
+    "models": {
+        "llm_variant": "e2b",
+        "llm_model": "assets/gemma4_e2b/gemma-4-E2B-it-Q4_K_M.gguf",
+        "pocket_model": "english_2026-10",
+        "pocket_tts_max_tokens": 100,
+    },
+    "external_tools": {
+        "wav2wem_path": "state/bin/wav2wem.exe",
+        "wav2wem_quality": 6,
+        "ffmpeg_path": "state/bin/ffmpeg.exe",
+    },
+}
+
+LLM_PROMPTING_DEFAULTS = {
+    "category_labels": {
+        "units_received": "Increased Funds",
+        "units_insufficient": "Insufficient Funds",
+    },
+    "combat": {
+        "special_categories": [
+            "Missile Launch",
+            "Missile Destroyed",
+            "Dreadnought Departure",
+            "Dreadnought Disabled",
+            "Freighter Combat",
+            "Freighter Destroyed",
+        ],
+    },
+    "files": {
+        "csv_path": "assets/data/nms_suit_voice_transcripts.csv",
+        "transcripts_path": "assets/data/nms_suit_voice_transcripts.json",
+        "base_prompt": "assets/data/base_prompt.txt",
+        "dynamic_prompt": "assets/data/dynamic_prompt.txt",
+        "combat_prompt": "assets/data/combat_prompt.txt",
+        "prompt_data": "assets/data/prompt_data.json",
+    },
+}
+
+CUSTOMIZATION_DEFAULTS = {
+    "tts_voice": "fantine",
+    "player_name": "Interloper",
+    "phrase_settings": {
+        "wordiness": "Standard",
+        "tone": "Standard",
+    },
+    "voice_effects": {
+        "gain_db": 5,
+        "tempo": 1.02,
+        "rate": 0.50,
+        "ring_freq": 300,
+        "ring_mix": 100,
+        "pitch_semitones": 4,
+        "formant_percent": 80,
+        "loudness_target": -5.0,
+        "loudness_true_peak": 5.0,
+    },
+}
 
 def load_json(path: Path) -> dict:
     if not path.exists():
@@ -35,12 +114,12 @@ class SuitVoiceConfig:
         # Anchor to project root (parent of engine/)
         root_dir = Path(__file__).parent.parent
         self.root_dir = root_dir
-        config_dir = root_dir / "assets" / "config"
 
-        # Load file structures
-        self.environment = load_json(config_dir / "environment_config.json")
-        self.llm_prompting = load_json(config_dir / "llm_prompting.json")
-        self.default_customization = load_json(config_dir / "default_customization.json")
+        # Hardcoded defaults (deep-copied so runtime mutation never bleeds into
+        # the module constants); personal values override via the user config.
+        self.environment = copy.deepcopy(ENVIRONMENT_DEFAULTS)
+        self.llm_prompting = copy.deepcopy(LLM_PROMPTING_DEFAULTS)
+        self.default_customization = copy.deepcopy(CUSTOMIZATION_DEFAULTS)
         self.user_customization_path = root_dir / "state" / "user" / "user_customization.json"
         self.user_customization = load_json(self.user_customization_path)
 
@@ -157,8 +236,8 @@ class SuitVoiceConfig:
                 raise SystemExit("ffmpeg not found on PATH. Please install ffmpeg or set up path contexts.")
         self.ffmpeg_path = Path(ffmpeg_path)
 
-        # --- ML MODEL INITIALIZATIONS ---
-        models = self.environment.get("models", {})
+        # --- ML MODEL INITIALIZATIONS (tracked defaults + untracked user overrides) ---
+        models = {**self.environment.get("models", {}), **self.user_customization.get("models", {})}
 
         # Pocket TTS settings (engine lazy-loads on first use; see engine/tts_utils.py)
         self.pocket_model_name = models.get("pocket_model", tts_utils.POCKET_DEFAULT_MODEL)
@@ -166,8 +245,20 @@ class SuitVoiceConfig:
         self.tts_voice = self.customization.get("tts_voice", tts_utils.POCKET_DEFAULT_VOICE)
         self.tts_model = None  # Populated by engine.tts_utils.get_pocket_model()
 
-        # Llama Engine Setup
-        self.llm_model = str(self.resolve_json_path(models.get("llm_model"), root_dir, must_exist=True))
+        # Llama Engine Setup: explicit user path override > selected variant > tracked default.
+        self.llm_variant = active_llm_variant(self.environment, self.user_customization)
+        variant_gguf = llm_variant_gguf(root_dir, self.llm_variant)
+        user_models = self.user_customization.get("models", {})
+        if user_models.get("llm_model"):
+            self.llm_model = str(self.resolve_json_path(user_models["llm_model"], root_dir, must_exist=True))
+        elif variant_gguf.is_file():
+            self.llm_model = str(variant_gguf)
+            if self.llm_variant != DEFAULT_LLM_VARIANT:
+                print(f"LLM variant in use: {self.llm_variant} ({variant_gguf.name})")
+        else:
+            if self.llm_variant != DEFAULT_LLM_VARIANT:
+                print(f"Selected LLM variant '{self.llm_variant}' is not downloaded - using the default model. Run Setup to fetch it.")
+            self.llm_model = str(self.resolve_json_path(models.get("llm_model"), root_dir, must_exist=True))
         self.llm = None  # You can also use self.llm: Optional[Llama] = None if it squawks here too
         if init_llm:
             self.load_llm()
@@ -213,7 +304,6 @@ class SuitVoiceConfig:
         """Newest mtime across the live-editable settings files (0.0 if none exist)."""
         candidates = [
             self.user_customization_path,
-            self.root_dir / "assets" / "config" / "environment_config.json",
             prompt_presets.presets_path(self.root_dir),
         ]
         mtimes = [p.stat().st_mtime for p in candidates if p.is_file()]
@@ -225,7 +315,7 @@ class SuitVoiceConfig:
         user = load_json(self.user_customization_path)
         self.user_customization = user
         self.customization = deep_merge(self.default_customization, user)
-        self.environment = load_json(self.root_dir / "assets" / "config" / "environment_config.json")
+        self.environment = copy.deepcopy(ENVIRONMENT_DEFAULTS)
 
         changed = []
 

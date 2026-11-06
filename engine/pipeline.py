@@ -3,7 +3,7 @@ import json
 import time
 from pathlib import Path
 from engine.quick_cache import (begin_sweep_wave, end_sweep_wave, get_cached_wem,
-                                move_cachedfile_to_mod_dir, _settings_fingerprint)
+                                move_cachedfile_to_mod_dir, refill_core_cache, _settings_fingerprint)
 from engine.oplock_watch import OplockWatch
 from PIL import Image
 # NOTE: No global config or TTS instantiations live at the top of this file anymore!
@@ -227,6 +227,7 @@ def watch_wems(wtray_ui, config):
                 ]
                 if not stale:
                     print("[VoiceFiles] Mod folder already matches the current voice; nothing to do.")
+                    refill_core_cache(config)  # a wiped/dry cache self-heals here at boot
                     return
                 used = [i for i in stale if i in config.intent_map and str(config.intent_map[i].get("Used", "")).strip().lower() == "yes"]
                 ordered = used + [i for i in stale if i not in used]

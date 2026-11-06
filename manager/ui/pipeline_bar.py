@@ -150,6 +150,8 @@ class PipelineBar(QFrame):
             target = int(runtime.get("quick_cache_max", 16))
             if counts:
                 text = f" · {sum(counts) / len(counts):.1f}/{target} iterations pre-cached"
+            else:
+                text = f" · 0/{target} iterations pre-cached - filling"
         except OSError:
             pass
         self._depth_text = text

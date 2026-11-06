@@ -1,7 +1,7 @@
 # manager/ui/main_window.py - frameless dark main window for the DSV Manager.
+import copy
 import ctypes
 import json
-import sys
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QEvent, Qt, QTimer
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from engine.config import ENVIRONMENT_DEFAULTS
 from engine.path_utils import is_pipeline_running
 from ui.pipeline_bar import _CLOSE_FORCE_AFTER_S, PipelineBar
 from ui.tabs_audio import AudioTab
@@ -71,7 +72,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.project_root = Path(__file__).parent.parent.parent
-        self.env_config_file = self.project_root / "assets" / "config" / "environment_config.json"
         self.user_config_file = self.project_root / "state" / "user" / "user_customization.json"
         self._threads = []
         self._resize_drag_edges = None
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
             widget.setMouseTracking(True)
 
         if not self.setup_pending:
-            runtime = self.env_data.get("runtime", {})
+            runtime = {**self.env_data.get("runtime", {}), **self.user_data.get("runtime", {})}
             if runtime.get("autostart_pipeline", True) and not is_pipeline_running():
                 QTimer.singleShot(1200, self.pipeline_bar._pipeline_start)
 
@@ -156,11 +156,7 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------- configuration
     def _load_configurations(self):
-        try:
-            self.env_data = json.loads(self.env_config_file.read_text(encoding="utf-8"))
-        except Exception as e:
-            QMessageBox.critical(self, "Configuration Error", f"Could not read environment config:\n{e}")
-            sys.exit(1)
+        self.env_data = copy.deepcopy(ENVIRONMENT_DEFAULTS)  # shipped defaults, never written back
         if self.user_config_file.exists():
             self.user_data = json.loads(self.user_config_file.read_text(encoding="utf-8"))
         else:
@@ -201,10 +197,18 @@ class MainWindow(QMainWindow):
         return voice_tab._select_by_key(key)
 
     def save_and_continue_settings(self):
+        old_variant = str(self.user_data.get("models", {}).get("llm_variant", "e2b")).lower()
         self._execute_file_save_matrix()
         self.user_data = json.loads(self.user_config_file.read_text(encoding="utf-8"))
+        note = ""
+        if str(self.user_data.get("models", {}).get("llm_variant", "e2b")).lower() != old_variant:
+            if is_pipeline_running():
+                self.pipeline_bar._pipeline_stop(on_done=self.pipeline_bar._pipeline_start)
+                note = " The voice engine is restarting to load the new rephrasing model."
+            else:
+                note = " The new rephrasing model loads the next time the engine starts."
         QMessageBox.information(
-            self, "Applied", "Preferences committed safely to disk! The window stays open for further edits."
+            self, "Applied", "Preferences committed safely to disk!" + note + " The window stays open for further edits."
         )
 
     def _execute_file_save_matrix(self):
@@ -220,7 +224,6 @@ class MainWindow(QMainWindow):
             mod_dir = system_tab.mod_dir_edit.text().strip()
             if mod_dir:
                 self.user_data.setdefault("paths", {})["mod_dir"] = mod_dir.replace("\\", "/")
-        self.env_config_file.write_text(json.dumps(self.env_data, indent=4), encoding="utf-8")
 
         # user customization: paths + identity + preferences + effects + voice
         updated = self.user_data if self.user_config_file.exists() else {}
@@ -233,6 +236,8 @@ class MainWindow(QMainWindow):
             updated["runtime"]["quick_cache_max"] = int(system_tab.cache_max_spin.value())
             updated["runtime"]["serve_workers"] = int(system_tab.serve_spin.value())
             updated["runtime"]["gen_threads"] = int(system_tab.threads_spin.value())
+            if hasattr(system_tab, "model_combo"):
+                updated.setdefault("models", {})["llm_variant"] = system_tab.model_combo.currentData() or "e2b"
         updated.setdefault("tts_voice", "fantine")
         if profile_tab is not None:
             updated["player_name"] = profile_tab.name_edit.text().strip() or "Interloper"

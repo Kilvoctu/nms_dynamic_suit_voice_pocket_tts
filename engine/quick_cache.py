@@ -53,6 +53,7 @@ def _settings_fingerprint(config) -> str:
         str(getattr(config, "current_wordiness", "")),
         str(getattr(config, "player_name", "")),
         str(getattr(config, "suit_voice_base", "")),
+        Path(str(getattr(config, "llm_model", ""))).stem,  # rephrasing-model era
     ])
     return hashlib.sha1(era.encode("utf-8")).hexdigest()[:12]
 
@@ -510,6 +511,34 @@ def _maybe_start_filler_round(just_served=None):
         enqueue_job(_replacement_wrapper, config, wem_id, wem_dir, True, priority=30)
     depth_now = depth_sum / depth_count if depth_count else 0
     print(f"[Cache] Filler round: +1 variant for {len(to_queue)} line(s) - depth now {depth_now:.1f}/{max_depth}.")
+
+
+def refill_core_cache(config):
+    """Boot/refresh tail for a dry cache: enqueue core-depth variants for tracked
+    lines whose current-era stock is low, then let filler rounds grow toward max."""
+    global _restock_config
+    if config is None or not getattr(config, "intent_map", None):
+        return
+    _restock_config = config
+    max_depth = max(0, int(getattr(config, "quick_cache_max", 16) or 0))
+    core = min(_RESTOCK_CORE, max_depth)
+    if core <= 0:
+        return
+    prefix_base = f"{_voice_tag(getattr(config, 'tts_voice', '') or 'unknown')}_{_settings_fingerprint(config)}_"
+    queued = 0
+    for wem_id, info in config.intent_map.items():
+        if str(info.get("Used", "")).strip().lower() != "yes":
+            continue
+        wem_dir = Path(config.quick_cache_dir) / str(wem_id)
+        with _jobs_lock:
+            pending = _active_jobs_count.get(str(wem_id), 0)
+        have = len(list(wem_dir.glob(f"{wem_id}_{prefix_base}*.wem"))) if wem_dir.is_dir() else 0
+        for _ in range(max(0, core - (have + pending))):
+            enqueue_job(_replacement_wrapper, config, wem_id, wem_dir, True, priority=20)
+            queued += 1
+    if queued:
+        print(f"[Cache] Boot refill: enqueued {queued} core variant(s) for a dry cache.")
+    _maybe_start_filler_round()
 
 
 def _enqueue_restock(config, wem_id, wem_dir, rephrase, inventory):

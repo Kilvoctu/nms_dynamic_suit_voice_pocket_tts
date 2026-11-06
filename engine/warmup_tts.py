@@ -11,29 +11,18 @@ from engine import tts_utils
 def main():
     print("Pipeline: Starting Pocket TTS warmup (first run downloads model weights)...")
     project_root = Path(__file__).parent.parent.absolute()
-    env_config_path = project_root / "assets" / "config" / "environment_config.json"
 
-    if not env_config_path.exists():
-        print(f"ERROR: Cannot warm up engine. Configuration profile missing: {env_config_path}")
-        sys.exit(1)
-
-    with open(env_config_path, "r", encoding="utf-8") as f:
-        env_data = json.load(f)
-
-    pocket_model = env_data.get("models", {}).get("pocket_model", tts_utils.POCKET_DEFAULT_MODEL)
-
-    # Resolve the active voice: user customization overrides the defaults
+    # Defaults live in code; the untracked user config is the only override source.
+    pocket_model = tts_utils.POCKET_DEFAULT_MODEL
     voice = tts_utils.POCKET_DEFAULT_VOICE
-    for cfg_path in (
-        project_root / "assets" / "config" / "default_customization.json",
-        project_root / "state" / "user" / "user_customization.json",
-    ):
-        if cfg_path.exists():
-            try:
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    voice = json.load(f).get("tts_voice", voice)
-            except Exception as e:
-                print(f"Warning: could not read {cfg_path.name}: {e}")
+    user_file = project_root / "state" / "user" / "user_customization.json"
+    if user_file.exists():
+        try:
+            user_data = json.loads(user_file.read_text(encoding="utf-8"))
+            pocket_model = user_data.get("models", {}).get("pocket_model") or pocket_model
+            voice = user_data.get("tts_voice") or voice
+        except Exception as e:
+            print(f"Warning: could not read {user_file.name}: {e}")
 
     # Fire up the synthesis warmup routine (downloads weights into cache/hub if missing)
     try:

@@ -68,3 +68,42 @@ def purge_cache_audio(project_root, env_data: dict) -> int:
                 except OSError:
                     pass
     return purged
+
+
+# Gemma 4 rephrasing model variants (System Environment tab selection).
+# Values: dir/file = GGUF location under the repo, url = Setup download source,
+# label = Advanced Settings display text.
+LLM_VARIANTS = {
+    "e2b": {
+        "dir": "assets/gemma4_e2b",
+        "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+        "url": "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf",
+        "label": "E2B (fast baseline)",
+    },
+    "e4b": {
+        "dir": "assets/gemma4_e4b",
+        "file": "gemma-4-E4B-it-Q4_K_M.gguf",
+        "url": "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+        "label": "E4B (richer lines, 3x slower)",
+    },
+}
+DEFAULT_LLM_VARIANT = "e2b"
+
+
+def active_llm_variant(environment: dict, user_cfg: dict) -> str:
+    """Merged llm_variant choice (untracked user override over the tracked default)."""
+    models = {**environment.get("models", {}), **user_cfg.get("models", {})}
+    variant = str(models.get("llm_variant", DEFAULT_LLM_VARIANT)).strip().lower()
+    return variant if variant in LLM_VARIANTS else DEFAULT_LLM_VARIANT
+
+
+def llm_variant_gguf(project_root, variant: str) -> Path:
+    """Absolute GGUF path for a known variant id."""
+    meta = LLM_VARIANTS[variant]
+    return Path(project_root) / meta["dir"] / meta["file"]
+
+
+def unused_llm_variant_file(project_root, environment: dict, user_cfg: dict) -> Path:
+    """GGUF of the variant that is NOT selected (purge target); caller checks existence."""
+    other = next(k for k in LLM_VARIANTS if k != active_llm_variant(environment, user_cfg))
+    return llm_variant_gguf(project_root, other)

@@ -6,6 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QFrame,
     QGroupBox,
@@ -22,8 +23,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from manager.setup_runner import SetupRunner
-from engine.path_utils import is_pipeline_running, purge_cache_audio, resolve_mod_root, resolve_mod_wem_dir
+from manager.setup_runner import SetupRunner, is_setup_complete
+from engine.path_utils import (
+    LLM_VARIANTS,
+    active_llm_variant,
+    is_pipeline_running,
+    purge_cache_audio,
+    resolve_mod_root,
+    resolve_mod_wem_dir,
+    unused_llm_variant_file,
+)
 
 
 class SystemTab(QWidget):
@@ -124,14 +133,16 @@ class SystemTab(QWidget):
         # First-time setup -------------------------------------------------
         setup_group = QGroupBox(" First-Time Setup ")
         left.addWidget(setup_group)
+        self.setup_group = setup_group
         setup_layout = QVBoxLayout(setup_group)
 
         self.setup_btn = QPushButton("Setup")
         self.setup_btn.clicked.connect(self._run_setup)
         self.setup_btn.setToolTip(
             "One-time installation: creates the venv, downloads dependencies,\n"
-            "ffmpeg, the wav2wem encoder and the local LLM (~3 GB total), then\n"
-            "copies the starter voice files into your mod directory."
+            "ffmpeg, the wav2wem encoder and the local LLM model(s) (~3 GB total;\n"
+            "the E4B variant adds ~4.6 GB when it is selected in Advanced Settings),\n"
+            "then copies the starter voice files into your mod directory."
         )
         setup_layout.addWidget(self.setup_btn)
 
@@ -153,12 +164,13 @@ class SystemTab(QWidget):
         left.addWidget(maintenance)
         maint_layout = QVBoxLayout(maintenance)
 
-        self.purge_btn = QPushButton("Wipe Cached Voice Variants")
+        self.purge_btn = QPushButton("Wipe Cache and Unused Model")
         self.purge_btn.clicked.connect(self._purge_audio_cache)
         self.purge_btn.setToolTip(
-            "Emergency cleanup: deletes all cached voice variants and temp renders\n"
-            "(model weights untouched) for a clean rebuild. Rarely needed - the\n"
-            "mod manages this cache automatically and re-fills it as you play."
+            "Emergency cleanup: deletes all cached voice variants and temp renders, plus the\n"
+            "Gemma 4 GGUF of the rephrasing model that is NOT selected (re-downloadable via\n"
+            "Setup). The active model and Pocket TTS weights stay untouched. Rarely needed -\n"
+            "the mod manages this cache automatically and re-fills it as you play."
         )
         maint_layout.addWidget(self.purge_btn)
 
@@ -238,20 +250,76 @@ class SystemTab(QWidget):
         self.threads_spin.setFixedWidth(110)
         threads_row.addWidget(self.threads_spin)
         vault_layout.addLayout(threads_row)
+
+        # Rephrasing model choice: E2B vs E4B GGUF, committed on Apply Changes.
+        variant = active_llm_variant(self.window.env_data, self.window.user_data)
+        self.model_combo = QComboBox()
+        for key, meta in LLM_VARIANTS.items():
+            gguf = self.window.project_root / meta["dir"] / meta["file"]
+            label = meta["label"] if gguf.is_file() else f"{meta['label']} - missing (Setup fetches)"
+            self.model_combo.addItem(label, userData=key)
+        index = self.model_combo.findData(variant)
+        self.model_combo.setCurrentIndex(index if index >= 0 else 0)
+        self.model_combo.setFixedWidth(230)
+        self.model_combo.setToolTip(
+            "Which Gemma 4 GGUF rephrases the suit's lines.\n"
+            "E2B: fast baseline, ~1 s per line, 2.9 GB. E4B: wider phrasing variety, stronger\n"
+            "persona flavor, ~3 s per line, 4.6 GB.\n"
+            "Switching on Apply Changes restarts the engine (a few seconds to reload).\n"
+            "A missing selection falls back to E2B until Setup fetches it."
+        )
+        model_row = QHBoxLayout()
+        model_label = QLabel("Rephrasing model:")
+        model_label.setWordWrap(True)
+        model_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        model_row.addWidget(model_label, 1)
+        model_row.addWidget(self.model_combo)
+        vault_layout.addLayout(model_row)
+        self.model_combo.currentIndexChanged.connect(self._refresh_setup_panel)
         vault_layout.addStretch(1)
 
+        self._refresh_setup_panel()  # hide the panel when everything is already fine
+
     # ------------------------------------------------------------ helpers
+    def _setup_panel_reason(self) -> str | None:
+        """Why the First-Time Setup panel must be visible, or None to hide it."""
+        if self.window.setup_pending:
+            return "Finish first-time setup to unlock all tabs."
+        if not is_setup_complete(self.window.project_root):
+            return "Installation incomplete - run Setup to repair it."
+        raw = self.mod_dir_edit.text().strip().replace("\\", "/").rstrip("/")
+        registered = str(self.window.user_data.get("paths", {}).get("mod_dir", ""))
+        registered = registered.replace("\\", "/").rstrip("/")
+        if raw and raw != registered:
+            return "Directory changed - run Setup to install the starter voice files there."
+        meta = LLM_VARIANTS.get(self.model_combo.currentData())
+        if meta and not (self.window.project_root / meta["dir"] / meta["file"]).is_file():
+            return f"The selected rephrasing model is not downloaded - Setup will fetch {meta['file']}."
+        return None
+
+    def _refresh_setup_panel(self):
+        """Show the First-Time Setup panel only while something actually needs it."""
+        thread = getattr(self, "_setup_thread", None)
+        if thread is not None and thread.isRunning():
+            return  # never fight a running setup
+        reason = self._setup_panel_reason()
+        self.setup_group.setVisible(reason is not None)
+        if reason and not self.window.setup_pending:
+            self.setup_hint.setText(reason)
+            self.setup_hint.setStyleSheet("color: #FBBF24; font-style: italic;")
+
     def _sync_setup_button(self):
-        if self.mod_dir_edit.text().strip():
-            self.setup_btn.setEnabled(True)
-            self.setup_hint.setText(
-                "Ready. Setup installs the venv, dependencies, tools, models and starter voice files."
-            )
-            self.setup_hint.setStyleSheet("color: #4ADE80; font-style: italic;")
-        else:
-            self.setup_btn.setEnabled(False)
-            self.setup_hint.setText("Enter a mod directory above to enable Setup.")
-            self.setup_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.setup_btn.setEnabled(bool(self.mod_dir_edit.text().strip()))
+        if self.window.setup_pending:
+            if self.setup_btn.isEnabled():
+                self.setup_hint.setText(
+                    "Ready. Setup installs the venv, dependencies, tools, models and starter voice files."
+                )
+                self.setup_hint.setStyleSheet("color: #4ADE80; font-style: italic;")
+            else:
+                self.setup_hint.setText("Enter a mod directory above to enable Setup.")
+                self.setup_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self._refresh_setup_panel()
 
     def _browse_mod_directory(self):
         chosen = QFileDialog.getExistingDirectory(
@@ -299,10 +367,10 @@ class SystemTab(QWidget):
             QMessageBox.warning(self, "Log Error", f"Could not open the pipeline log:\n{exc}")
 
     def _save_autostart(self, checked: bool):
-        self.window.env_data.setdefault("runtime", {})["autostart_pipeline"] = bool(checked)
+        self.window.user_data.setdefault("runtime", {})["autostart_pipeline"] = bool(checked)
         try:
-            self.window.env_config_file.write_text(
-                json.dumps(self.window.env_data, indent=4), encoding="utf-8"
+            self.window.user_config_file.write_text(
+                json.dumps(self.window.user_data, indent=4), encoding="utf-8"
             )
         except OSError:
             pass
@@ -332,7 +400,8 @@ class SystemTab(QWidget):
             self, "Confirm Setup",
             f"Voice files will be installed into:\n{mod_wem_dir}\n\n"
             "This also creates the venv, downloads dependencies, ffmpeg, the wav2wem\n"
-            "encoder and the local LLM model (approx 3 GB total). Continue?",
+            "encoder and the local LLM model(s) (approx 3 GB; the E4B variant adds\n"
+            "~4.6 GB when selected in Advanced Settings). Continue?",
         ) != QMessageBox.StandardButton.Yes:
             return
 
@@ -352,15 +421,19 @@ class SystemTab(QWidget):
     def _setup_finished(self, ok: bool, error: str | None):
         self.setup_btn.setEnabled(True)
         self.mod_dir_edit.setEnabled(True)
-        self._sync_setup_button()
         if ok:
             self.setup_log.setVisible(False)  # reclaim the space on success
-            self.setup_hint.setText("Setup complete. Restart the utility to unlock all tabs.")
-            self.setup_hint.setStyleSheet("color: #4ADE80; font-style: italic;")
-            QMessageBox.information(
-                self, "Setup Complete",
-                "Setup finished successfully!\n\nRestart the Management Utility to unlock all tabs.",
-            )
+        self._sync_setup_button()
+        if ok:
+            if self.window.setup_pending:
+                self.setup_hint.setText("Setup complete. Restart the utility to unlock all tabs.")
+                self.setup_hint.setStyleSheet("color: #4ADE80; font-style: italic;")
+                QMessageBox.information(
+                    self, "Setup Complete",
+                    "Setup finished successfully!\n\nRestart the Management Utility to unlock all tabs.",
+                )
+            else:
+                self._set_status("Setup complete", "#4ADE80")
         else:
             self.setup_hint.setText("Setup failed - see the log for details.")
             self.setup_hint.setStyleSheet("color: #F87171; font-style: italic;")
@@ -380,12 +453,22 @@ class SystemTab(QWidget):
             self, "Confirm Purge",
             "Permanently erase all pre-generated voice variants and temporary\n"
             "render files from the local cache folders?\n\n"
-            "(Pocket TTS model weights are NOT touched.)",
+            "This also deletes the Gemma 4 GGUF of the rephrasing model that is\n"
+            "NOT selected (re-download it any time via Setup).\n\n"
+            "(The active model and Pocket TTS weights are NOT touched.)",
         ) != QMessageBox.StandardButton.Yes:
             return
         try:
             purged = purge_cache_audio(self.window.project_root, self.window.env_data)
-            QMessageBox.information(self, "Success", f"Exosuit local audio storage purged cleanly ({purged} files)!")
+            removed_model = ""
+            unused_gguf = unused_llm_variant_file(
+                self.window.project_root, self.window.env_data, self.window.user_data)
+            if unused_gguf.is_file():
+                unused_gguf.unlink()
+                removed_model = f"\n\nUnused model file removed: {unused_gguf.name}"
+            QMessageBox.information(
+                self, "Success",
+                f"Exosuit local audio storage purged cleanly ({purged} files)!{removed_model}")
         except Exception as err:
             QMessageBox.critical(self, "Purge Error", f"Could not flush file boundaries: {err}")
 

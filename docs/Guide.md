@@ -20,7 +20,7 @@ Fork Repository: [nms_dynamic_suit_voice_pocket_tts](https://github.com/Kilvoctu
 2. In **System Environment**, enter your No Man's Sky MODS directory (Setup offers to create it):
    - Steam (example): `C:/Program Files (x86)/Steam/steamapps/common/No Man's Sky/GAMEDATA/MODS/`
    - MS Store (example): `D:/XboxGames/No Man's Sky/Content/GAMEDATA/MODS/`
-3. Press **Setup**. It prepares the venv and dependencies, downloads ffmpeg, the `wav2wem` encoder and the Gemma-4-E2B model into the project folder, copies the starter voice files into your MODS folder, saves the path to your personal config, and verifies the TTS engine end to end.
+3. Press **Setup**. It prepares the venv and dependencies, downloads ffmpeg, the `wav2wem` encoder and the Gemma 4 LLM model(s) (the E2B default, plus the E4B when it is selected in Advanced Settings; ~3-8 GB), copies the starter voice files into your MODS folder, saves the path to your personal config, and verifies the TTS engine end to end.
 4. When it reports **Setup Complete**, restart `run_manager.cmd` - all tabs unlock. Re-running Setup later skips completed steps.
 
 ## Run the generator
@@ -28,6 +28,12 @@ Fork Repository: [nms_dynamic_suit_voice_pocket_tts](https://github.com/Kilvoctu
 Open **`run_manager.cmd`** (the console flashes and dismisses itself). The manager starts the voice pipeline automatically and shows live status in the bottom bar. Once it reads **Ready**, start No Man's Sky. Play until your suit notifies you twice about the same thing; the second phrase will be different.
 
 Voice: **Voice Model** tab (8 built-ins plus clones, see below). Sound: **Audio Modifiers** tab, where the current sliders can be saved as your own named presets. Changes apply to the running engine automatically - no restart needed. After applying any change, the suit's lines are quietly re-recorded in the background.
+
+## Rephrasing model
+
+**System Environment → Advanced Settings → Rephrasing model** picks which local Gemma 4 model rephrases your lines. **E2B** (default) is light and fast; **E4B** delivers wider phrasing variety and stronger persona flavor at roughly three times the generation time. Swap on **Apply Changes** - if the engine is running it restarts automatically (a few seconds to reload the model). If the selected model file is missing, the engine falls back to E2B until **Setup** downloads it (the First-Time Setup panel reappears in the System tab when that happens). Advanced Settings also holds the cache-depth, worker and CPU-thread knobs.
+
+**System Environment → Troubleshooting → Wipe Cache and Unused Model** erases all cached voice variants and temp renders, **plus** the Gemma 4 GGUF of the model that is *not* selected - handy after a swap to reclaim the disk space. The active model and Pocket TTS weights are never touched; a deleted model re-downloads via **Setup** any time.
 
 ## Prompt presets
 

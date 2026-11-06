@@ -14,15 +14,18 @@ PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 
 # Shared resolver (stdlib-only module - safe to import before deps exist)
 sys.path.insert(0, str(PROJECT_ROOT))
-from engine.path_utils import STARTER_WEMS_SUBPATH, resolve_mod_root, resolve_mod_wem_dir
+from engine.path_utils import (
+    LLM_VARIANTS,
+    STARTER_WEMS_SUBPATH,
+    active_llm_variant,
+    resolve_mod_root,
+    resolve_mod_wem_dir,
+)
 
 WAV2WEM_URL = "https://github.com/pas2k/wav2wem/releases/download/v0.1/wav2wem.exe"
 WAV2WEM_SHA256 = "5a10738a73d5451ede6a526a7aa0bfe7f42b41faffe78c9b62ec9f223f91d736"
 FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip"
 FFMPEG_ZIP_BIN_DIR = "ffmpeg-master-latest-win64-lgpl/bin"
-GEMMA_URL = "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf"
-GEMMA_RELATIVE_DIR = "assets/gemma4_e2b"
-GEMMA_FILENAME = "gemma-4-E2B-it-Q4_K_M.gguf"
 STARTER_WEMS_RELATIVE = STARTER_WEMS_SUBPATH
 
 
@@ -42,18 +45,12 @@ def is_setup_complete(project_root: Path = PROJECT_ROOT) -> bool:
         return False
 
     try:
-        env_data = json.loads((pr / "assets" / "config" / "environment_config.json").read_text(encoding="utf-8"))
-    except Exception:
-        env_data = {}
-    try:
         user_file = (pr / "state" / "user" / "user_customization.json")
         user_data = json.loads(user_file.read_text(encoding="utf-8"))
     except Exception:
         user_data = {}
-    # Personal mod dir lives in the untracked user config; the env value is
-    # only the shipped default.
-    mod_dir_setting = (user_data.get("paths", {}).get("mod_dir")
-                       or env_data.get("paths", {}).get("mod_dir", ""))
+    # The personal mod dir lives in the untracked user config (Setup registers it).
+    mod_dir_setting = user_data.get("paths", {}).get("mod_dir", "")
     if not mod_dir_setting:
         return False
     mod_dir = resolve_mod_wem_dir(mod_dir_setting)
@@ -176,20 +173,31 @@ class SetupRunner:
         self.log("  wav2wem.exe checksum OK.")
 
     def step_model(self):
-        target = self.project_root / GEMMA_RELATIVE_DIR / GEMMA_FILENAME
-        if target.is_file() and target.stat().st_size > 10 * 1024 * 1024:
-            self.log("LLM rephrasing model already present, skipping download.")
-            return
-        env_file = self.project_root / "assets" / "config" / "environment_config.json"
+        """Default E2B always materializes (the engine's fallback); the selected
+        variant is fetched too so the swap in Advanced Settings can land."""
+        self._ensure_llm_file("e2b", "LLM rephrasing model")
+        variant = self._selected_llm_variant()
+        if variant in LLM_VARIANTS and variant != "e2b":
+            self._ensure_llm_file(variant, f"selected LLM variant ({variant})")
+
+    def _selected_llm_variant(self) -> str:
+        user_file = self.project_root / "state" / "user" / "user_customization.json"
         try:
-            env_data = json.loads(env_file.read_text(encoding="utf-8"))
-            url = env_data.get("model_url", {}).get("gemma4_e2b", GEMMA_URL)
+            user_cfg = json.loads(user_file.read_text(encoding="utf-8"))
         except Exception:
-            url = GEMMA_URL
-        self.log(f"Downloading LLM rephrasing model ({GEMMA_FILENAME}, approx 3 GB)...")
+            user_cfg = {}
+        return active_llm_variant({}, user_cfg)
+
+    def _ensure_llm_file(self, variant_key: str, label: str):
+        meta = LLM_VARIANTS[variant_key]
+        target = self.project_root / meta["dir"] / meta["file"]
+        if target.is_file() and target.stat().st_size > 10 * 1024 * 1024:
+            self.log(f"{label} already present, skipping download.")
+            return
+        self.log(f"Downloading {label} ({meta['file']}, several GB)...")
         target.parent.mkdir(parents=True, exist_ok=True)
-        self._download(url, target, "llm model")
-        self.log("  LLM model ready.")
+        self._download(meta["url"], target, "llm model")
+        self.log(f"  {label} ready.")
 
     def step_starter_wems(self):
         starter = self.project_root / STARTER_WEMS_RELATIVE

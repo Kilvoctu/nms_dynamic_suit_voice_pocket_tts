@@ -190,8 +190,8 @@ class VoiceModelTab(QWidget):
     def _pocket_model(self) -> str:
         """Configured Pocket TTS model key, falling back to the code default."""
         try:
-            env_data = json.loads(self.window.env_config_file.read_text(encoding="utf-8"))
-            return env_data.get("models", {}).get("pocket_model") or tts_utils.POCKET_DEFAULT_MODEL
+            user_data = json.loads(self.window.user_config_file.read_text(encoding="utf-8"))
+            return user_data.get("models", {}).get("pocket_model") or tts_utils.POCKET_DEFAULT_MODEL
         except Exception:
             return tts_utils.POCKET_DEFAULT_MODEL
 

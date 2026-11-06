@@ -47,6 +47,12 @@ class _Entry:
         self.fails = 0
 
 
+# Closing a handle with a pending oplock IRP cancels it; the completion then writes the
+# status into the OVERLAPPED asynchronously. Keep those structs alive or the kernel writes
+# into freed memory (observed as a delayed 0xc0000005 in python310.dll).
+_ov_graveyard = []
+
+
 class OplockWatch:
     """Arms level-1 oplocks on tracked wem files; poll_ack() reports files whose
     oplock broke (someone opened them). Maintains re-arms; stat/open-by-us is safe."""
@@ -86,8 +92,8 @@ class OplockWatch:
         self._entries.clear()
 
     def _shut_handle(self, entry):
-        # Closing the handle acknowledges any pending break implicitly; the kernel
-        # keeps the event object alive until the cancelled I/O derefs it.
+        # Closing the handle acknowledges a broken oplock or cancels a still-pending IRP;
+        # the cancelled completion writes into the OVERLAPPED later, so graveyard the struct.
         if entry.handle:
             try:
                 _k32.CloseHandle(entry.handle)
@@ -95,6 +101,10 @@ class OplockWatch:
                 pass
         if entry.ov is not None and entry.ov.hEvent:
             _k32.CloseHandle(entry.ov.hEvent)
+        if entry.ov is not None:
+            _ov_graveyard.append(entry.ov)
+            if len(_ov_graveyard) > 1024:
+                _ov_graveyard.pop(0)
         entry.handle, entry.ov = None, None
         self._wait_dirty = True
 

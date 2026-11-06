@@ -160,7 +160,6 @@ def watch_wems(wtray_ui, config):
                     if not is_retry:  # a dry cache ends the refire silently (verdict line already spoke)
                         print(f"[Watch] {wem_id} - no variant available; leaving the current file in place.")
                 else:
-                    # quick_cache guards only the in-place overwrite open (rename denials break nothing)
                     moved_file = move_cachedfile_to_mod_dir(
                         config, cached_file, fire_dir, wem_id,
                         on_attempt=lambda: _oplock.suppress(wem_id, seconds=0.6))

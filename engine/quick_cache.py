@@ -287,7 +287,58 @@ def _log_swap_holders(dst_path: Path, wem_id: str):
 
 _OVERWRITE_HELD_WEMS = True  # write new variant bytes into a replace-locked wem (needs holder write-share)
 _OVERWRITE_DELAY_S = 0.2  # write the moment replace is denied: the NEXT play must see this variant
-_overwrite_denied_ids = set()  # wems whose holder shares no write: overwrite skips only these lines
+_OVERWRITE_DENY_TTL_S = 120  # denial expiry: a later serve re-probes in case the holder's share changed
+_overwrite_denied_until = {}  # wem_id -> monotonic time until which overwrite skips this line
+_posix_denied_ids = set()  # wems whose holder shares no delete: posix rename logs once and is skipped
+
+_FILE_RENAME_INFO_EX_CLASS = 22  # FileRenameInfoEx in FILE_INFO_BY_HANDLE_CLASS
+_RENAME_REPLACE_POSIX = 0x3  # FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS
+
+
+class _RenameInfoEx(ctypes.Structure):
+    _fields_ = [("Flags", wt.DWORD), ("RootDirectory", wt.HANDLE),
+                ("FileNameLength", wt.DWORD), ("FileName", ctypes.c_wchar * 1024)]
+
+
+def _posix_replace_held(dst_path: Path, src_path: Path) -> int:
+    """POSIX-semantics rename of src over dst while any holder keeps it open;
+    returns 0 on success or the winerror (32 = a holder shares no delete)."""
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateFileW.restype = wt.HANDLE
+    k32.CreateFileW.argtypes = [wt.LPCWSTR, wt.DWORD, wt.DWORD, wt.LPVOID, wt.DWORD, wt.DWORD, wt.HANDLE]
+    k32.SetFileInformationByHandle.restype = wt.BOOL
+    k32.SetFileInformationByHandle.argtypes = [wt.HANDLE, wt.DWORD, wt.LPVOID, wt.DWORD]
+    # DELETE access on the SOURCE (our cache file) + POSIX flags replace the target entry
+    # without delete rights on the target's holders.
+    handle = k32.CreateFileW(str(src_path), 0x00010000, 0x7, None, 3, 0x80, None)
+    if handle in (None, wt.HANDLE(-1).value):
+        return ctypes.get_last_error() or 2
+    info = _RenameInfoEx()
+    info.Flags = _RENAME_REPLACE_POSIX
+    dst_str = str(dst_path)
+    info.FileNameLength = len(dst_str) * 2
+    info.FileName = dst_str  # type: ignore[misc]
+    ok = k32.SetFileInformationByHandle(handle, _FILE_RENAME_INFO_EX_CLASS, ctypes.byref(info),
+                                        ctypes.sizeof(info))
+    err = 0 if ok else ctypes.get_last_error()
+    k32.CloseHandle(handle)
+    return err
+
+
+def _try_posix_swap(config, dst_path: Path, src_path: Path, wem_id: str) -> bool:
+    """One POSIX-rename shot per serve; logs the holder's no-delete-share once per line."""
+    err = _posix_replace_held(dst_path, src_path)
+    if err == 0:
+        record_mod_manifest(config, wem_id)
+        print(f"[Cache] POSIX-swapped held {dst_path.name} - fresh audio live for the next play.")
+        return True
+    if err in (2, 3):
+        return False  # src already claimed by a concurrent serve of the same line: benign race
+    if err != 32 or wem_id not in _posix_denied_ids:
+        _posix_denied_ids.add(wem_id)
+        print(f"[Cache] POSIX rename on {dst_path.name} denied (winerror {err}) - "
+              f"{'holder shares no delete' if err == 32 else 'see winerror'}; overwrite stays the mid-hold route.")
+    return False
 
 def _try_overwrite_held(config, dst_path: Path, src_path: Path, wem_id: str) -> bool:
     """Rewrite the held wem's content in place with the new variant (no delete rights needed)."""
@@ -299,11 +350,11 @@ def _try_overwrite_held(config, dst_path: Path, src_path: Path, wem_id: str) -> 
     except FileNotFoundError:
         return False  # no held content (transient) - the normal replace path handles it
     except PermissionError as d_e:
-        # sharing/access denial = the holder shares no write; retrying this line's route is pointless
-        _overwrite_denied_ids.add(wem_id)
+        # sharing/access denial = the holder shares no write; re-probe after a TTL, not never
+        _overwrite_denied_until[wem_id] = time() + _OVERWRITE_DENY_TTL_S
         code = getattr(d_e, "winerror", None) or d_e.errno
         print(f"[Cache] write-open on {dst_path.name} denied (system error {code}) - "
-              f"in-place overwrite disabled for this line.")
+              f"in-place overwrite paused for this line ({_OVERWRITE_DENY_TTL_S}s).")
         return False
     except OSError:
         return False  # transient I/O issue - the normal replace path continues
@@ -317,9 +368,8 @@ def _try_overwrite_held(config, dst_path: Path, src_path: Path, wem_id: str) -> 
 
 
 def move_cachedfile_to_mod_dir(config, src_path: Path, mod_dir: Path, wem_id: str, on_attempt=None):
-    """Moves a cached WEM file to the mod_dir, renames it, and records which
-    voice/settings era produced it in the mod folder manifest. on_attempt runs
-    before the in-place write-open: the one swap open that can break our oplock."""
+    """Moves a cached WEM file into the mod dir and records the voice/settings era in the
+    folder manifest. Ladder: replace, POSIX rename every cycle, in-place overwrite (once, TTL-gated)."""
     mod_dir.mkdir(parents=True, exist_ok=True)
     dst_path = mod_dir / f"{wem_id}.wem"
 
@@ -338,14 +388,18 @@ def move_cachedfile_to_mod_dir(config, src_path: Path, mod_dir: Path, wem_id: st
                 _log_swap_holders(dst_path, wem_id)
                 return None
             attempt += 1
-            # first in-place shot: the NEXT play reads this variant (a streaming current play may glitch)
-            if not overwrite_tried and time() - start_time >= _OVERWRITE_DELAY_S \
-                    and _OVERWRITE_HELD_WEMS and wem_id not in _overwrite_denied_ids:
-                if on_attempt:
-                    on_attempt()  # this write-open breaks our armed oplock; guard exactly this slice
-                if _try_overwrite_held(config, dst_path, src_path, wem_id):
+            if time() - start_time >= _OVERWRITE_DELAY_S:
+                # POSIX rename is the mid-hold workhorse: verified to succeed over an ARMED
+                # target and over delete-sharing holders, so re-fire it every cycle until it lands
+                if _try_posix_swap(config, dst_path, src_path, wem_id):
                     return dst_path
-            overwrite_tried = overwrite_tried or time() - start_time >= _OVERWRITE_DELAY_S
+                if not overwrite_tried and _OVERWRITE_HELD_WEMS \
+                        and _overwrite_denied_until.get(wem_id, 0) < time():
+                    if on_attempt:
+                        on_attempt()  # this write-open breaks our armed oplock; guard exactly this slice
+                    if _try_overwrite_held(config, dst_path, src_path, wem_id):
+                        return dst_path
+                overwrite_tried = overwrite_tried or time() - start_time >= _OVERWRITE_DELAY_S
             # exponential ramp 0.1s -> 0.5s cap: steady 10 Hz retry bursts can trip AV heuristics
             sleep(min(0.5, 0.05 * (2 ** min(attempt, 4))))
 

@@ -104,8 +104,8 @@ class OplockWatch:
             self._shut_handle(entry)
 
     # --- operations ------------------------------------------------------
-    def suppress(self, wem_id, seconds=8.0):
-        """Mark upcoming breaks of this id as engine-caused (our own swap)."""
+    def suppress(self, wem_id, seconds=0.6):
+        """Short per-attempt guard: breaks inside the window are our own swap's, not plays."""
         with self._lock:
             self._suppressed[wem_id] = time.monotonic() + seconds
 

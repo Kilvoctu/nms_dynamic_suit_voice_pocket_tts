@@ -17,7 +17,6 @@
   "files": {
     "csv_path": "assets/data/nms_suit_voice_transcripts.csv",
     "transcripts_path": "assets/data/nms_suit_voice_transcripts.json",
-    "tokenized_logits_path": "assets/data/logit_bias.json",
 
     "base_prompt": "assets/data/base_prompt.txt",
     "dynamic_prompt": "assets/data/dynamic_prompt.txt",

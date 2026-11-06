@@ -2,26 +2,10 @@ import time
 import re
 
 
-def create_logit_bias(config, category_l):
-    logit_bias = {
-        **extract_token_ids(config.logit_banlist.get(category_l, {})),
-        **extract_token_ids(config.logit_banlist.get("Standard", {})),
-    }  # to add more categorys like Encouraged or Discouraged with different scores use Default as template
-    return logit_bias
-
-
-def extract_token_ids(data: dict):
-    """Flatten token dict and ignore non-integer keys like 'bias'."""
-    return {int(k): v for k, v in data.get("tokens", {}).items()}
-
-
 def reword_phrase(config, wem_id_r,
                   category_r,
                   original_phrase_r,
                   finalprompt):
-    # enforce usage or avoidance of specific tokens using logits
-    logit_bias_list = create_logit_bias(config, category_r)
-
     messages = [{"role": "system", "content": finalprompt}]
     max_retries = 3
     for attempt in range(max_retries):
@@ -34,7 +18,6 @@ def reword_phrase(config, wem_id_r,
                 top_k=90,
                 top_p=0.9,
                 repeat_penalty=1.25,
-                logit_bias=logit_bias_list,
                 seed=-1  # must add this to randomize the results
             )
             # print(f"Raw Output:\n {output}")

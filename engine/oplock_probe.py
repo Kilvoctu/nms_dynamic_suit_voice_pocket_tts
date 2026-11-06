@@ -1,4 +1,4 @@
-# tools/oplock_probe.py
+# engine/oplock_probe.py
 """Oplock probe: prove that second-process opens (read/mmap) break a level-1 oplock
 held by this process, and that attribute-only opens/stat do not. Stdlib only."""
 import ctypes

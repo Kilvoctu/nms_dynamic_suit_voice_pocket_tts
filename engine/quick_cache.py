@@ -1,4 +1,6 @@
 from time import time, sleep
+import ctypes
+import ctypes.wintypes as wt
 import hashlib
 import itertools
 import json
@@ -21,6 +23,7 @@ _tts_worker_thread: threading.Thread | None = None
 _MANIFEST_FILENAME = "mod_folder_manifest.json"
 _FALLBACK_WAIT_TIMEOUT_S = 120  # max wait for an on-demand generation before skipping
 _RESTOCK_CORE = 2  # variants per line topped up at serve time; deeper filler runs in rounds
+SWAP_GIVE_UP_S = 16  # per-attempt cap: the game normally frees a played wem in seconds, not minutes
 
 # Track how many active background tasks are currently scheduled per WEM ID
 _active_jobs_count = {}
@@ -192,27 +195,159 @@ def _replacement_wrapper(config, wem_id: str, wem_dir: Path, rephrase: bool = Tr
         _render_queue.put((priority, next(_render_seq), (config, wem_id, wem_dir, reworded)))
 
 
-def move_cachedfile_to_mod_dir(config, src_path: Path, mod_dir: Path, wem_id: str):
+# --- Restart Manager plumbing: name the process(es) holding a file open at swap give-up ---
+class _RM_FILETIME(ctypes.Structure):
+    _fields_ = [("lo", wt.DWORD), ("hi", wt.DWORD)]
+
+class _RM_UNIQUE_PROCESS(ctypes.Structure):
+    _fields_ = [("pid", wt.DWORD), ("start", _RM_FILETIME)]
+
+class _RM_PROCESS_INFO(ctypes.Structure):
+    _fields_ = [("proc", _RM_UNIQUE_PROCESS),
+                ("app", wt.WCHAR * 256),
+                ("service", wt.WCHAR * 64),
+                ("type", wt.DWORD),
+                ("status", wt.DWORD),
+                ("session", wt.DWORD),
+                ("restartable", wt.BOOL)]
+
+_SESSION_KEY_BUF = wt.WCHAR * 33  # CCH_RM_SESSION_KEY (32) + terminator
+try:
+    _RM_DLL = ctypes.WinDLL("rstrtmgr.dll")
+    _RM_DLL.RmStartSession.restype = wt.DWORD
+    _RM_DLL.RmStartSession.argtypes = [ctypes.POINTER(wt.DWORD), wt.DWORD, ctypes.POINTER(_SESSION_KEY_BUF)]
+    _RM_DLL.RmRegisterResources.restype = wt.DWORD
+    _RM_DLL.RmRegisterResources.argtypes = [wt.DWORD, wt.UINT, ctypes.POINTER(wt.LPCWSTR), wt.UINT,
+                                            ctypes.POINTER(_RM_UNIQUE_PROCESS), wt.UINT,
+                                            ctypes.POINTER(wt.LPCWSTR)]
+    _RM_DLL.RmGetList.restype = wt.DWORD
+    _RM_DLL.RmGetList.argtypes = [wt.DWORD, ctypes.POINTER(wt.UINT), ctypes.POINTER(wt.UINT),
+                                  ctypes.POINTER(_RM_PROCESS_INFO), ctypes.POINTER(wt.DWORD)]
+    _RM_DLL.RmEndSession.restype = wt.DWORD
+    _RM_DLL.RmEndSession.argtypes = [wt.DWORD]
+except OSError:
+    _RM_DLL = None  # diagnostic only: degrade silently
+
+
+def _rm_holder_names(file_path: Path) -> tuple:
+    """(foreign_names, self_present): open-handle holders per Restart Manager; ([], False) on failure."""
+    if _RM_DLL is None:
+        return [], False
+    session, key = wt.DWORD(0), _SESSION_KEY_BUF()
+    if _RM_DLL.RmStartSession(ctypes.byref(session), 0, ctypes.byref(key)) != 0:
+        return [], False
+    try:
+        if _RM_DLL.RmRegisterResources(session, 1, (wt.LPCWSTR * 1)(str(file_path)), 0, None, 0, None) != 0:
+            return [], False
+        needed, count, reasons = wt.UINT(0), wt.UINT(0), wt.DWORD(0)
+        # NULL buffer first: ERROR_MORE_DATA (234) reports the true holder count in `needed`
+        rc = _RM_DLL.RmGetList(session, ctypes.byref(needed), ctypes.byref(count), None, ctypes.byref(reasons))
+        if needed.value == 0 or (rc != 0 and rc != 234):
+            return [], False
+        count = wt.UINT(min(needed.value, 64))
+        buf = (_RM_PROCESS_INFO * count.value)()
+        if _RM_DLL.RmGetList(session, ctypes.byref(needed), ctypes.byref(count), buf, ctypes.byref(reasons)) != 0:
+            return [], False
+        names, self_present, my_pid = [], False, os.getpid()
+        for info in buf[:count.value]:
+            if info.proc.pid == my_pid:
+                self_present = True
+                continue  # our own handles share delete, so they are never the replace blocker
+            if info.app and info.app not in names:
+                names.append(info.app)
+        return names, self_present
+    finally:
+        _RM_DLL.RmEndSession(session)
+
+
+_holder_report_lock = threading.Lock()
+_holder_report_last = {}
+
+def _log_swap_holders(dst_path: Path, wem_id: str):
+    """Sole give-up line (one per held wem per 90s): who (or what) keeps the target replace-blocked."""
+    with _holder_report_lock:
+        now = time()
+        if now - _holder_report_last.get(wem_id, 0.0) < 90.0:  # one line per hold incident, not per retry
+            return
+        _holder_report_last[wem_id] = now
+    try:
+        names, self_present = _rm_holder_names(dst_path)
+    except Exception:
+        return  # diagnostic only, never block the serve path
+    note = f"retrying every 1s, attempt cap {SWAP_GIVE_UP_S}s"
+    if names:
+        print(f"[Cache] {dst_path.name} is held open by: {', '.join(names)} - {note}.")
+    elif self_present:
+        print(f"[Cache] {dst_path.name} replace denied, RM only sees this engine (own handles don't block) "
+              f"- blocker is likely a memory-mapped section in the game; {note}.")
+    else:
+        print(f"[Cache] {dst_path.name} replace denied with no RM-visible holder - blocker is likely a "
+              f"memory-mapped section in the game (FMOD); {note}.")
+
+
+_OVERWRITE_HELD_WEMS = True  # write new variant bytes into a replace-locked wem (needs holder write-share)
+_OVERWRITE_DELAY_S = 0.2  # write the moment replace is denied: the NEXT play must see this variant
+_overwrite_denied_ids = set()  # wems whose holder shares no write: overwrite skips only these lines
+
+def _try_overwrite_held(config, dst_path: Path, src_path: Path, wem_id: str) -> bool:
+    """Rewrite the held wem's content in place with the new variant (no delete rights needed)."""
+    try:
+        payload = src_path.read_bytes()
+        with open(dst_path, "r+b") as fh:
+            fh.write(payload)
+            fh.truncate()
+    except FileNotFoundError:
+        return False  # no held content (transient) - the normal replace path handles it
+    except PermissionError as d_e:
+        # sharing/access denial = the holder shares no write; retrying this line's route is pointless
+        _overwrite_denied_ids.add(wem_id)
+        code = getattr(d_e, "winerror", None) or d_e.errno
+        print(f"[Cache] write-open on {dst_path.name} denied (system error {code}) - "
+              f"in-place overwrite disabled for this line.")
+        return False
+    except OSError:
+        return False  # transient I/O issue - the normal replace path continues
+    try:
+        src_path.unlink()
+    except OSError:
+        pass  # stray cache copy; the next serve's listing treats it as a normal variant
+    record_mod_manifest(config, wem_id)
+    print(f"[Cache] overwrote held {dst_path.name} in place - fresh audio live for the next play.")
+    return True
+
+
+def move_cachedfile_to_mod_dir(config, src_path: Path, mod_dir: Path, wem_id: str, on_attempt=None):
     """Moves a cached WEM file to the mod_dir, renames it, and records which
-    voice/settings era produced it in the mod folder manifest."""
+    voice/settings era produced it in the mod folder manifest. on_attempt runs
+    before the in-place write-open: the one swap open that can break our oplock."""
     mod_dir.mkdir(parents=True, exist_ok=True)
     dst_path = mod_dir / f"{wem_id}.wem"
 
     start_time = time()
+    attempt = 0
+    overwrite_tried = False
     while True:
         try:
             src_path.replace(dst_path)
             record_mod_manifest(config, wem_id)
             return dst_path
+        except FileNotFoundError:
+            return None  # variant already claimed by a concurrent serve of the same line
         except (PermissionError, OSError):
-            if time() - start_time > 120:
+            if time() - start_time > SWAP_GIVE_UP_S:
+                _log_swap_holders(dst_path, wem_id)
                 return None
-            sleep(0.1)
-
-def update_access_time_to_match_newfile(file_path: Path, access_times: dict):
-    """Updates the access_times dict with the atime of the given file."""
-    access_times[file_path.stem] = file_path.stat().st_atime
-
+            attempt += 1
+            # first in-place shot: the NEXT play reads this variant (a streaming current play may glitch)
+            if not overwrite_tried and time() - start_time >= _OVERWRITE_DELAY_S \
+                    and _OVERWRITE_HELD_WEMS and wem_id not in _overwrite_denied_ids:
+                if on_attempt:
+                    on_attempt()  # this write-open breaks our armed oplock; guard exactly this slice
+                if _try_overwrite_held(config, dst_path, src_path, wem_id):
+                    return dst_path
+            overwrite_tried = overwrite_tried or time() - start_time >= _OVERWRITE_DELAY_S
+            # exponential ramp 0.1s -> 0.5s cap: steady 10 Hz retry bursts can trip AV heuristics
+            sleep(min(0.5, 0.05 * (2 ** min(attempt, 4))))
 
 def janitor_pass(config):
     """Boot-time cache cleanup (background thread): untracked wem dirs, stale-era

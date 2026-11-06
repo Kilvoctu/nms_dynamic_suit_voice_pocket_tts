@@ -122,9 +122,6 @@ class SuitVoiceConfig:
         self.suit_voice_combat_path = self.resolve_json_path(files.get("combat_prompt"), root_dir, must_exist=True)
         self.suit_voice_combat = self.suit_voice_combat_path.read_text(encoding="utf-8")
 
-        self.tokenized_logits_path = self.resolve_json_path(files.get("tokenized_logits_path"), root_dir, must_exist=True)
-        self.logit_banlist = json.loads(self.tokenized_logits_path.read_text(encoding="utf-8"))
-
         # --- COMBAT / CATEGORY METRIC SETTING ---
         combat_cfg = self.llm_prompting.get("combat", {})
         self.mil_cat = combat_cfg.get("special_categories", [])

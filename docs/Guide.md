@@ -11,7 +11,7 @@ Fork Repository: [nms_dynamic_suit_voice_pocket_tts](https://github.com/Kilvoctu
 ## Requirements
 
 - Windows 10/11
-- Python 3.10 or 3.11 installed and on PATH (3.12+ breaks dependencies)
+- Python 3.11, 3.12, or 3.13 (64-bit)
 - Internet access for the one-time downloads (dependencies, ffmpeg, the wav2wem encoder, the local LLM model - roughly 4.5 GB total)
 
 ## Installation

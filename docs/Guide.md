@@ -27,7 +27,7 @@ Fork Repository: [nms_dynamic_suit_voice_pocket_tts](https://github.com/Kilvoctu
 
 Open **`run_manager.cmd`** (the console flashes and dismisses itself). The manager starts the voice pipeline automatically and shows live status in the bottom bar. Once it reads **Ready**, start No Man's Sky. Play until your suit notifies you twice about the same thing; the second phrase will be different.
 
-Voice: **Voice Model** tab (8 built-ins plus clones, see below). Sound: **Audio Modifiers** tab, where the current sliders can be saved as your own named presets. Changes apply to the running engine automatically - no restart needed. After applying any change, the suit's lines are quietly re-recorded in the background.
+**Voice Modifier** tab contains all the options for customizing your suit's voice. Each preset contains parameters for changing voice (8 built-ins plus clones) and fine-tune delivery: volume, speed/pitch, a parametric EQ and the effects rack (doubler, bit crusher, decimator, ring modulator, radio band, echo, reverb, compressor, limiter). You can test and compare against a baseline with "Test Voice" and "A/B Dry", and manage your presets. Voice cloning management lives in **System Environment**.
 
 ## Rephrasing model
 
@@ -45,11 +45,11 @@ Tone and verbiage presets live on the **User Profile** tab; built-ins can't be c
 
 ## Voice cloning
 
-Use the **Clone a Voice** panel in the manager's **Voice Model** tab: type a name (spaces are fine and become underscores; `\ / : * ? " < > |` aren't allowed), pick a clean sample, press **Clone Voice**. The first clone downloads the cloning model once (online, from Hugging Face); after that, cloning and the voice engine itself stay fully local.
+Use the **Voice Cloning** panel in the manager's **System Environment** tab: type a name (spaces are fine and become underscores; `\ / : * ? " < > |` aren't allowed), pick a clean sample, press **Clone Voice**. The first clone downloads the cloning model once (online, from Hugging Face); after that, cloning and the voice engine itself stay fully local.
 
-A clean sample means one speaker, no music or background noise, 10-30 seconds, as a `.wav` file. The voice appears in the **Voice Model** tab - select it and press **Apply Changes** to make it your suit's voice (the engine re-renders the mod folder to match). Clones stay local in `user/pocket_voices/`, and a voice state only loads for the pinned model (`english_2026-10`). Remove a clone via **Remove Voice**.
+A clean sample means one speaker, no music or background noise, 10-30 seconds, as a `.wav` file. The voice appears in the **Voice Modifier** tab's voice dropdown - select it and press **Apply Changes** to make it your suit's voice (the engine re-renders the mod folder to match). Clones stay local in `user/pocket_voices/`, and a voice state only loads for the pinned model (`english_2026-10`). Manage clones via **Rename** / **Delete** in System Environment.
 
-If cloning reports "voice cloning unsupported", press **Sign in & Preload Model** in the Voice Model tab: it opens a Hugging Face sign-in window (paste an access token from huggingface.co - free account, create one under Settings → Access Tokens and accept the model's terms there) and then downloads the cloning model. The sign-in is remembered on your PC, so press **Clone Voice** again and it works from then on.
+If cloning reports "voice cloning unsupported", press **Sign in & Preload Model** in System Environment: it opens a Hugging Face sign-in window (paste an access token from huggingface.co - free account, create one under Settings → Access Tokens and accept the model's terms there) and then downloads the cloning model. The sign-in is remembered on your PC, so press **Clone Voice** again and it works from then on.
 
 ## Shutting it down
 

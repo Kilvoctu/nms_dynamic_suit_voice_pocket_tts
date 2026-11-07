@@ -1,11 +1,11 @@
 # manager/ui/tabs_profile.py - user identity, briefing text and prompt preferences.
+import html
 import json
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from engine import prompt_presets
+from ui.style import BEZEL_GAP, HINT_QSS, PAGE_MARGIN, make_group
+
 from ui.preset_manager import PresetManagerDialog
 
 
@@ -27,11 +29,12 @@ class ProfileTab(QWidget):
         phrase_settings = user_data.get("phrase_settings", {})
 
         root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN)
+        root_layout.setSpacing(BEZEL_GAP)
 
         # Panel 1: iteration identity -------------------------------------
-        identity = QGroupBox(" Iteration Identity Registration ")
+        identity, identity_layout = make_group(" ITERATION IDENTITY REGISTRATION ")
         root_layout.addWidget(identity)
-        identity_layout = QVBoxLayout(identity)
         row = QHBoxLayout()
         identity_layout.addLayout(row)
         row.addWidget(QLabel("Iteration Name:"))
@@ -40,18 +43,17 @@ class ProfileTab(QWidget):
         row.addWidget(self.name_edit)
 
         # Panel 2: live briefing ------------------------------------------
-        briefing = QGroupBox(" Exosuit Core System Briefing ")
+        briefing, briefing_layout = make_group(" EXOSUIT CORE SYSTEM BRIEFING ")
         root_layout.addWidget(briefing, 1)
-        briefing_layout = QVBoxLayout(briefing)
         self.briefing_label = QLabel("")
+        self.briefing_label.setTextFormat(Qt.TextFormat.RichText)  # per-paragraph margins
         self.briefing_label.setWordWrap(True)
         self.briefing_label.setAlignment(Qt.AlignmentFlag.AlignTop)
         briefing_layout.addWidget(self.briefing_label)
 
         # Panel 3: companion preferences -----------------------------------
-        prefs = QGroupBox(" Companion Preferences ")
+        prefs, prefs_layout = make_group(" COMPANION PREFERENCES ")
         root_layout.addWidget(prefs)
-        prefs_layout = QVBoxLayout(prefs)
         self._presets = prompt_presets.load_presets(window.project_root)
 
         grid = QGridLayout()
@@ -62,7 +64,7 @@ class ProfileTab(QWidget):
 
         def _desc_label(ignored: bool):
             lbl = QLabel("")
-            lbl.setStyleSheet("color: #8a8a8a; font-style: italic;")
+            lbl.setStyleSheet(HINT_QSS)
             if ignored:
                 lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             return lbl
@@ -197,25 +199,34 @@ class ProfileTab(QWidget):
 
     def _refresh_briefing_text(self):
         current_name = self.name_edit.text().strip() or "..."
-        self.briefing_label.setText(
-            f"Greetings {current_name}!\n\n"
-            "Welcome to your Dynamic Suit Voice diagnostic dashboard.\n\n"
-            "This management utility directly bridges your customized preferences with the local voice synthesis "
-            "pipeline. Adjusting settings on these tabs allows you to tailor your suit's personality and acoustic "
-            "metrics cleanly before (or during) deployment - the running engine picks up applied changes "
-            "automatically.\n\n"
-            "QUICK-START FLIGHT MANUAL:\n"
-            "\u2022 User Profile: Assign your personalized iteration designation and choose your AI's narrative behaviors. "
-            "'Manage' opens the preset editor: custom tone/verbiage presets, the core prompt with its persona distiller, "
-            "and a combination test on a real in-game phrase.\n"
-            "\u2022 Audio Modifiers: Fine-tune post-processing filters or test customized presets inside the live sandbox.\n"
-            "\u2022 Voice Model: Select your synthesis voice, or clone your own; first-time cloning setup lives here too.\n"
-            "\u2022 System Environment: Configure game directory pathways, run first-time Setup, adjust background polling "
-            "refresh scales, and watch the live pipeline log.\n\n"
-            "Choose 'Apply Changes' at any time to save choices to disk while keeping your testing sandbox open. "
-            "Closing the window hides it to the tray while the engine keeps running; the tray icon's Exit stops the "
-            "engine and quits."
+        # (text, bottom margin): full break between sections, half break between steps.
+        paras = (
+            (f"Greetings {html.escape(current_name)}!", 14),
+            ("Welcome to your Dynamic Suit Voice diagnostic dashboard.", 14),
+            ("All settings shape your suit's voice and personality. Apply Changes commits them, "
+             "and the running engine picks them up automatically.", 14),
+            ("QUICK-START FLIGHT MANUAL:", 4),
+            ("1. USER PROFILE. Name your iteration. Choose your AI's narrative behaviors. Manage "
+             "opens the preset editor: custom tone/verbiage presets, the core prompt with its "
+             "persona distiller, and a combination test on a real in-game phrase. Descriptions "
+             "under the dropdowns update live as you switch presets.", 8),
+            ("2. VOICE MODIFIER. Pick the synthesis voice and character presets. Fine-tune the "
+             "EQ/FX rack: drag the EQ nodes, click empty space to add a band, right-click a node "
+             "for type and removal. Trim the volume slider if lines ride too quiet or too loud in "
+             "game. Test Voice renders the current rack in the sandbox; A/B Dry plays the raw "
+             "voice for comparison. Save, Save As, Rename, Import and Export keep your own "
+             "presets one click away.", 8),
+            ("3. SYSTEM ENVIRONMENT. Clone voices from a clean sample (10 to 30 seconds, one "
+             "speaker, no music); the first clone adds a one-time model sign-in and download. "
+             "Wipe Cache and Unused Model is the emergency exit, and a wiped cache refills itself "
+             "on the next boot. Watch the live pipeline log.", 14),
+            ("FLIGHT NOTES:", 4),
+            ("Apply Changes saves to disk at any time while keeping the testing sandbox open. "
+             "Closing the window hides it to the tray; the engine keeps running. The tray icon's "
+             "Exit stops the engine and quits.", 0),
         )
+        self.briefing_label.setText("".join(
+            f'<p style="margin: 0 0 {margin}px 0">{text}</p>' for text, margin in paras))
         self.update_live_descriptions()
 
     def update_live_descriptions(self):

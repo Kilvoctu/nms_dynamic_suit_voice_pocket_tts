@@ -1,7 +1,27 @@
 # wem_utils.py
+import struct
 import subprocess
 from pathlib import Path
 import time
+
+_VANILLA_CHANNEL_MASK = 0x00003102
+_VANILLA_VORBIS_SUBGUID = bytes.fromhex("33f40000d9000000b858000000000d03")
+
+
+def _patch_wem_fmt(path: Path):
+    """Rewrite the wem fmt's channel mask + Vorbis subformat GUID to vanilla's,
+    so the game's decoder plays the file instead of dropping it."""
+    data = bytearray(path.read_bytes())
+    i = data.find(b"fmt ")
+    if i < 0:
+        return
+    size = struct.unpack_from("<I", data, i + 4)[0]
+    fmt = i + 8
+    if size < 40:
+        return
+    struct.pack_into("<I", data, fmt + 20, _VANILLA_CHANNEL_MASK)
+    data[fmt + 24:fmt + 40] = _VANILLA_VORBIS_SUBGUID
+    path.write_bytes(bytes(data))
 
 
 def convert_to_wem(config, temp_wav_path, output_path: Path):
@@ -27,6 +47,8 @@ def convert_to_wem(config, temp_wav_path, output_path: Path):
     except subprocess.CalledProcessError as e:
         print(f"Subprocess failed during WEM conversion: {e}")
         raise
+
+    _patch_wem_fmt(wem_file)
 
     # Move/rename to final output_path with retries
     max_attempts = 10

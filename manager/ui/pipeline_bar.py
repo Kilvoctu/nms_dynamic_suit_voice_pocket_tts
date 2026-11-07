@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMessageBox, QPushBut
 
 from engine import pipeline_status
 from engine.path_utils import is_pipeline_running
+from ui.style import DIM, GOOD, WARN
 
 _STOP_FORCE_AFTER_S = 20  # graceful window before offering a force kill
 _CLOSE_FORCE_AFTER_S = 15  # shorter patience when the user is closing the app
@@ -38,7 +39,7 @@ class PipelineBar(QFrame):
         self._stopping = False
         self._force_after_s = _STOP_FORCE_AFTER_S
         self._close_pending = None  # callback to finish app close once stopped
-        self._color = "#8a8a8a"
+        self._color = DIM
         self._full_text = "Status: checking..."
         self._title_suffix = "Starting"
         self._flash_until = 0.0  # monotonic deadline of a transient status message
@@ -52,11 +53,11 @@ class PipelineBar(QFrame):
         self.setFixedHeight(38)
 
         self.status_dot = QLabel("\u25cf")
-        self.status_dot.setStyleSheet("color: #8a8a8a;")
+        self.status_dot.setStyleSheet(f"color: {DIM}")
         layout.addWidget(self.status_dot)
 
         self.status_text = QLabel("Status: checking...")
-        self.status_text.setStyleSheet("font-weight: bold; color: #8a8a8a;")
+        self.status_text.setStyleSheet(f"font-weight: bold; color: {DIM}")
         layout.addWidget(self.status_text, 1)
 
         self.start_btn = QPushButton("Start")
@@ -149,9 +150,12 @@ class PipelineBar(QFrame):
                        **self.window.user_data.get("runtime", {})}  # tracked defaults, untracked overrides
             target = int(runtime.get("quick_cache_max", 16))
             if counts:
-                text = f" · {sum(counts) / len(counts):.1f}/{target} iterations pre-cached"
+                avg = sum(counts) / len(counts)
+                noun = "variant" if avg == 1 else "variants"
+                avg_text = f"{avg:.1f}".rstrip("0").rstrip(".")  # 1.0 -> 1, 0.8 stays 0.8
+                text = f" · {avg_text}/{target} {noun} pre-cached"
             else:
-                text = f" · 0/{target} iterations pre-cached - filling"
+                text = f" · 0/{target} variants pre-cached - filling"
         except OSError:
             pass
         self._depth_text = text
@@ -164,7 +168,7 @@ class PipelineBar(QFrame):
             self._flash_text = None
         if self.window.setup_pending:
             self._set_state("Status: Setup required - run Setup in the System Environment tab.",
-                            "#8a8a8a", False, False, "Setup Required")
+                            DIM, False, False, "Setup Required")
             return
 
         running = is_pipeline_running()
@@ -184,7 +188,7 @@ class PipelineBar(QFrame):
                     pid = status.get("pid")
                     self._force_kill(pid)
                     self._stop_deadline = time.time() + 5  # re-arm; verify death
-                self._set_state("Status: Stopping...", "#FBBF24", False, False, "Stopping...")
+                self._set_state("Status: Stopping...", WARN, False, False, "Stopping...")
             else:
                 queued = self._read_generation_queue(status)
                 depth = self._cache_depth_text()
@@ -193,10 +197,10 @@ class PipelineBar(QFrame):
                     # instead of a frozen "Ready" (amber = activity).
                     base = (f"Generating {queued} queued variant(s)" if not detail
                             else f"{detail} - {queued} queued")
-                    color = "#FBBF24"
+                    color = WARN
                 else:
                     base = detail or "listening for game lines"
-                    color = "#4ADE80"
+                    color = GOOD
                 self._set_state(
                     f"Status: Running - {base}{depth}",
                     color, False, True, f"Running ({detail or 'ready'})",
@@ -204,7 +208,7 @@ class PipelineBar(QFrame):
         else:
             self._stop_deadline = None
             self._stopping = False
-            self._set_state("Status: Stopped", "#8a8a8a", True, False, "Stopped")
+            self._set_state("Status: Stopped", DIM, True, False, "Stopped")
             if self._close_pending is not None:
                 callback, self._close_pending = self._close_pending, None
                 callback()

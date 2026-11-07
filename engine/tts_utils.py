@@ -25,9 +25,6 @@ POCKET_STATE_DIRNAME = "_model_states"
 POCKET_DEFAULT_MODEL = "english_2026-10"
 POCKET_DEFAULT_VOICE = "fantine"
 
-# Measured: wav2wem's oggenc2 stage costs ~0.9 dB integrated LUFS on float input.
-WEM_ENCODER_COMPENSATION_DB = 0.9
-
 _torch_threads = 0  # generation CPU cap for torch renders; 0 = torch default (all cores)
 
 
@@ -262,7 +259,10 @@ def run_tts(config, text: str, wem_num: str, postprocess: bool = True) -> Path:
     if postprocess:
         from engine.audio_chain import render_chain, write_wav_float
 
-        audio, sample_rate = render_chain(audio, sample_rate, config.voice_effects)
+        audio, sample_rate = render_chain(
+            audio, sample_rate, getattr(config, "eqfx_active", None) or {},
+            loudness_target=config.voice_effects.get("loudness_target"),
+            true_peak=float(config.voice_effects.get("loudness_true_peak", 5.0)))
         write_wav_float(final_wav, audio, sample_rate)
     else:
         _write_wav(final_wav, audio, sample_rate)

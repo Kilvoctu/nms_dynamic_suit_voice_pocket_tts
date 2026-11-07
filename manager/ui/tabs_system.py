@@ -1,16 +1,21 @@
 # manager/ui/tabs_system.py - System Environment tab: paths, setup, pipeline settings, cache maintenance.
 import json
 import os
+import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFrame,
-    QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -24,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from manager.setup_runner import SetupRunner, is_setup_complete
+from engine import tts_utils
 from engine.path_utils import (
     LLM_VARIANTS,
     active_llm_variant,
@@ -33,6 +39,30 @@ from engine.path_utils import (
     resolve_mod_wem_dir,
     unused_llm_variant_file,
 )
+from ui.style import (
+    BEZEL_GAP,
+    CONSOLE_COLOR,
+    CONSOLE_QSS,
+    DIM,
+    ERROR,
+    GOOD,
+    HINT_QSS,
+    MONO,
+    PAGE_MARGIN,
+    WARN,
+    make_group,
+    status_qss,
+)
+from ui.tabs_audio import _POCKET_TTS_TERMS_URL, _pocket_model
+from ui.workers import FunctionThread
+
+_CLONE_NAME_INVALID = re.compile(r'[\\/:*?"<>|]')
+
+
+def _sanitize_clone_name(name: str) -> str:
+    """Collapse a typed voice name into a filesystem-safe key (spaces become underscores)."""
+    cleaned = _CLONE_NAME_INVALID.sub("", name.strip())
+    return re.sub(r"\s+", "_", cleaned)
 
 
 class SystemTab(QWidget):
@@ -41,7 +71,13 @@ class SystemTab(QWidget):
         self.window = window
         self._setup_thread = None
         self._log_offset = 0
+        self._clone_thread = None
+        self._voice_setup_thread = None
+        self._clone_sample_path = None
+        self._clone_auth_hint = False
+        self._clone_log_tail = []
         self._build_ui()
+        self._refresh_clone_list()
         self._sync_setup_button()
         self._pipeline_log_timer = QTimer(self)
         self._pipeline_log_timer.setInterval(1000)
@@ -51,6 +87,8 @@ class SystemTab(QWidget):
     # ------------------------------------------------------------------ UI
     def _build_ui(self):
         root_layout = QHBoxLayout(self)
+        root_layout.setContentsMargins(PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN, PAGE_MARGIN)
+        root_layout.setSpacing(PAGE_MARGIN)
         # The scroll viewports otherwise paint the raw palette, which renders
         # darker than every other tab; transparency restores the page look.
         self.setStyleSheet(
@@ -73,15 +111,15 @@ class SystemTab(QWidget):
         right_scroll.setWidget(right_host)
         left = QVBoxLayout(left_host)
         left.setContentsMargins(0, 0, 0, 0)
-        left.setSpacing(5)  # keep the stacked groups scrollbar-free at default heights
+        left.setSpacing(BEZEL_GAP)
         right = QVBoxLayout(right_host)
         right.setContentsMargins(0, 0, 0, 0)
+        right.setSpacing(BEZEL_GAP)
         root_layout.addWidget(left_scroll, 5)
         root_layout.addWidget(right_scroll, 4)
 
-        pipeline_group = QGroupBox(" Voice Pipeline ")
+        pipeline_group, pipe_layout = make_group(" VOICE PIPELINE ")
         left.addWidget(pipeline_group)
-        pipe_layout = QVBoxLayout(pipeline_group)
 
         self.autostart_cb = QCheckBox(
             "Start the pipeline automatically when the utility opens"
@@ -103,9 +141,8 @@ class SystemTab(QWidget):
         )
         pipe_layout.addWidget(self.pipeline_log_btn)
 
-        paths_group = QGroupBox(" Core Platform File Infrastructure ")
+        paths_group, paths_layout = make_group(" CORE PLATFORM FILE INFRASTRUCTURE ")
         left.addWidget(paths_group)
-        paths_layout = QVBoxLayout(paths_group)
 
         paths_layout.addWidget(QLabel("No Man's Sky Target Mod Directory:"))
         dir_label = paths_layout.itemAt(paths_layout.count() - 1).widget()
@@ -131,10 +168,9 @@ class SystemTab(QWidget):
         paths_layout.addLayout(row)
 
         # First-time setup -------------------------------------------------
-        setup_group = QGroupBox(" First-Time Setup ")
+        setup_group, setup_layout = make_group(" FIRST-TIME SETUP ")
         left.addWidget(setup_group)
         self.setup_group = setup_group
-        setup_layout = QVBoxLayout(setup_group)
 
         self.setup_btn = QPushButton("Setup")
         self.setup_btn.clicked.connect(self._run_setup)
@@ -149,20 +185,106 @@ class SystemTab(QWidget):
         self.setup_hint = QLabel("Enter a mod directory above to enable Setup.")
         self.setup_hint.setWordWrap(True)
         self.setup_hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.setup_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.setup_hint.setStyleSheet(HINT_QSS)
         setup_layout.addWidget(self.setup_hint)
 
         self.setup_log = QPlainTextEdit()
         self.setup_log.setReadOnly(True)
         self.setup_log.setMaximumHeight(160)
-        self.setup_log.setStyleSheet("background-color: #121212; color: #00FF00; font-family: Consolas;")
+        self.setup_log.setStyleSheet(CONSOLE_QSS)
         self.setup_log.setVisible(False)  # only shown while Setup actually runs
         setup_layout.addWidget(self.setup_log)
 
+        # Voice cloning ------------------------------------------------------
+        clone_group, clone_layout = make_group(" VOICE CLONING ")
+        left.addWidget(clone_group)
+
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Name:"))
+        self.clone_name_edit = QLineEdit()
+        self.clone_name_edit.setPlaceholderText("Fairy")
+        self.clone_name_edit.setToolTip('Spaces become underscores; \\ / : * ? " < > | are not allowed.')
+        self.clone_name_edit.textChanged.connect(self._update_clone_button)
+        name_row.addWidget(self.clone_name_edit, 1)
+        clone_layout.addLayout(name_row)
+        self.clone_name_hint = QLabel("")
+        self.clone_name_hint.setStyleSheet(HINT_QSS)
+        self.clone_name_hint.setWordWrap(True)
+        self.clone_name_hint.setVisible(False)  # collapses the layout line until needed
+        clone_layout.addWidget(self.clone_name_hint)
+
+        sample_row = QHBoxLayout()
+        self.clone_sample_btn = QPushButton("Choose Sample...")
+        self.clone_sample_btn.setToolTip(
+            "A clean single-speaker wav, 10-30 seconds, no music or background noise."
+        )
+        self.clone_sample_btn.clicked.connect(self._choose_clone_sample)
+        sample_row.addWidget(self.clone_sample_btn)
+        self.clone_sample_label = QLabel("no sample selected")
+        self.clone_sample_label.setStyleSheet(f"color: {DIM}")
+        self.clone_sample_label.setWordWrap(True)
+        self.clone_sample_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        sample_row.addWidget(self.clone_sample_label, 1)
+        clone_layout.addLayout(sample_row)
+
+        self.clone_btn = QPushButton("Clone Voice")
+        self.clone_btn.setEnabled(False)
+        self.clone_btn.setToolTip(
+            "Builds a suit voice from the sample. First use downloads the full\n"
+            "cloning model once (online); the voice then appears in the Voice\n"
+            "Modifier tab's voice dropdown."
+        )
+        self.clone_btn.clicked.connect(self._trigger_async_clone)
+        clone_layout.addWidget(self.clone_btn)
+
+        self.clone_status = QLabel("Clone Queue: Idle")
+        self.clone_status.setStyleSheet(f"{MONO} color: {CONSOLE_COLOR};")
+        self.clone_status.setWordWrap(True)
+        self.clone_status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        clone_layout.addWidget(self.clone_status)
+
+        manage_row = QHBoxLayout()
+        manage_row.addWidget(QLabel("Manage clone:"))
+        self.clone_remove_combo = QComboBox()
+        self.clone_remove_combo.setToolTip("Cloned/custom voices; built-ins cannot be managed here.")
+        manage_row.addWidget(self.clone_remove_combo, 1)
+        self.rename_clone_btn = QPushButton("Rename")
+        self.rename_clone_btn.setToolTip(
+            "Renames the selected cloned voice; if it is the active voice, the\n"
+            "configuration follows the rename.")
+        self.rename_clone_btn.clicked.connect(self._rename_custom_voice)
+        manage_row.addWidget(self.rename_clone_btn)
+        self.remove_clone_btn = QPushButton("Delete")
+        self.remove_clone_btn.setToolTip("Deletes the selected cloned voice from user/pocket_voices/.")
+        self.remove_clone_btn.clicked.connect(self._remove_custom_voice)
+        manage_row.addWidget(self.remove_clone_btn)
+        clone_layout.addLayout(manage_row)
+
+        setup_group, setup_layout2 = make_group(" FIRST-TIME CLONING SETUP ")
+        self.clone_setup_group = setup_group
+        left.addWidget(setup_group)
+        setup_hint2 = QLabel("The first clone needs a one-time Hugging Face sign-in and model download.")
+        setup_hint2.setWordWrap(True)
+        setup_hint2.setStyleSheet(HINT_QSS)
+        setup_layout2.addWidget(setup_hint2)
+        hf_row = QHBoxLayout()
+        self.terms_btn = QPushButton("Open Terms Page")
+        self.terms_btn.setToolTip("Accept the model's terms on huggingface.co (free account).")
+        self.terms_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(_POCKET_TTS_TERMS_URL)))
+        hf_row.addWidget(self.terms_btn)
+        self.voice_setup_btn = QPushButton("Sign in && Preload Model")
+        self.voice_setup_btn.setToolTip(
+            "Opens a Hugging Face sign-in window, saves the token for cloning and\n"
+            "pre-downloads the cloning model so Clone Voice never waits on it."
+        )
+        self.voice_setup_btn.clicked.connect(self._trigger_voice_setup)
+        hf_row.addWidget(self.voice_setup_btn)
+        setup_layout2.addLayout(hf_row)
+
         # Troubleshooting ----------------------------------------------------
-        maintenance = QGroupBox(" Troubleshooting ")
+        maintenance, maint_layout = make_group(" TROUBLESHOOTING ")
         left.addWidget(maintenance)
-        maint_layout = QVBoxLayout(maintenance)
 
         self.purge_btn = QPushButton("Wipe Cache and Unused Model")
         self.purge_btn.clicked.connect(self._purge_audio_cache)
@@ -175,21 +297,17 @@ class SystemTab(QWidget):
         maint_layout.addWidget(self.purge_btn)
 
         # Live pipeline console: tails cache/pipeline.log
-        log_group = QGroupBox(" Pipeline Log ")
+        log_group, log_layout = make_group(" PIPELINE LOG ")
         right.addWidget(log_group, 1)
-        log_layout = QVBoxLayout(log_group)
         self.pipeline_log_view = QPlainTextEdit()
         self.pipeline_log_view.setReadOnly(True)
         self.pipeline_log_view.setMaximumBlockCount(400)
-        self.pipeline_log_view.setStyleSheet(
-            "background-color: #121212; color: #9CDCFE; font-family: Consolas;"
-        )
+        self.pipeline_log_view.setStyleSheet(CONSOLE_QSS)
         log_layout.addWidget(self.pipeline_log_view)
 
         # RIGHT PANE: advanced settings ------------------------------------
-        vault_group = QGroupBox(" Advanced Settings ")
+        vault_group, vault_layout = make_group(" ADVANCED SETTINGS ")
         left.addWidget(vault_group, 1)
-        vault_layout = QVBoxLayout(vault_group)
 
         self.warning_label = QLabel(
             "These values trade CPU load, disk use and voice variety against each other.\n"
@@ -197,7 +315,7 @@ class SystemTab(QWidget):
         )
         self.warning_label.setWordWrap(True)
         self.warning_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.warning_label.setStyleSheet("color: #F87171; font-style: italic;")
+        self.warning_label.setStyleSheet(status_qss(ERROR))
         vault_layout.addWidget(self.warning_label)
 
         runtime = {**self.window.env_data.get("runtime", {}),
@@ -306,7 +424,7 @@ class SystemTab(QWidget):
         self.setup_group.setVisible(reason is not None)
         if reason and not self.window.setup_pending:
             self.setup_hint.setText(reason)
-            self.setup_hint.setStyleSheet("color: #FBBF24; font-style: italic;")
+            self.setup_hint.setStyleSheet(status_qss(WARN))
 
     def _sync_setup_button(self):
         self.setup_btn.setEnabled(bool(self.mod_dir_edit.text().strip()))
@@ -315,10 +433,10 @@ class SystemTab(QWidget):
                 self.setup_hint.setText(
                     "Ready. Setup installs the venv, dependencies, tools, models and starter voice files."
                 )
-                self.setup_hint.setStyleSheet("color: #4ADE80; font-style: italic;")
+                self.setup_hint.setStyleSheet(status_qss(GOOD))
             else:
                 self.setup_hint.setText("Enter a mod directory above to enable Setup.")
-                self.setup_hint.setStyleSheet("color: #8a8a8a; font-style: italic;")
+                self.setup_hint.setStyleSheet(HINT_QSS)
         self._refresh_setup_panel()
 
     def _browse_mod_directory(self):
@@ -408,7 +526,7 @@ class SystemTab(QWidget):
         self.setup_btn.setEnabled(False)
         self.mod_dir_edit.setEnabled(False)
         self.setup_hint.setText("Setup running - see log below. Do not close the utility.")
-        self.setup_hint.setStyleSheet("color: #FBBF24; font-style: italic;")
+        self.setup_hint.setStyleSheet(status_qss(WARN))
         self.setup_log.clear()
         self.setup_log.setVisible(True)
 
@@ -427,17 +545,322 @@ class SystemTab(QWidget):
         if ok:
             if self.window.setup_pending:
                 self.setup_hint.setText("Setup complete. Restart the utility to unlock all tabs.")
-                self.setup_hint.setStyleSheet("color: #4ADE80; font-style: italic;")
+                self.setup_hint.setStyleSheet(status_qss(GOOD))
                 QMessageBox.information(
                     self, "Setup Complete",
                     "Setup finished successfully!\n\nRestart the Management Utility to unlock all tabs.",
                 )
             else:
-                self._set_status("Setup complete", "#4ADE80")
+                self._set_status("Setup complete", GOOD)
         else:
             self.setup_hint.setText("Setup failed - see the log for details.")
-            self.setup_hint.setStyleSheet("color: #F87171; font-style: italic;")
+            self.setup_hint.setStyleSheet(status_qss(ERROR))
             QMessageBox.critical(self, "Setup Failed", f"Setup encountered an issue:\n{error}")
+
+    # -------------------------------------------------------------- voice cloning
+    def _cloning_ready(self) -> bool:
+        """True when cloning can proceed without the setup button: the gated
+        cloning model is cached locally, or a Hugging Face credential exists."""
+        if os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"):
+            return True
+        if (Path.home() / ".cache" / "huggingface" / "token").is_file():
+            return True
+        if (self.window.project_root / "state" / "cache" / "token").is_file():
+            return True
+        model_key = _pocket_model(self.window)
+        hub = self.window.project_root / "state" / "cache" / "hub"
+        return any(
+            hub.glob(f"models--kyutai--pocket-tts/snapshots/*/languages/{model_key}/*.safetensors"))
+
+    def _update_clone_setup_visibility(self):
+        """The first-time cloning setup group only shows when cloning is not ready yet."""
+        self.clone_setup_group.setVisible(not self._cloning_ready())
+
+    def _refresh_clone_list(self):
+        """Fill the remove-clone dropdown with cloned/custom voices (built-ins excluded)."""
+        self.clone_remove_combo.blockSignals(True)
+        self.clone_remove_combo.clear()
+        model_name = _pocket_model(self.window)
+        for voice in tts_utils.list_pocket_voices(self.window.project_root, model_name):
+            if voice not in tts_utils.PREDEFINED_POCKET_VOICES:
+                self.clone_remove_combo.addItem(voice, voice)
+        self.clone_remove_combo.blockSignals(False)
+        self.remove_clone_btn.setEnabled(self.clone_remove_combo.count() > 0)
+        self.rename_clone_btn.setEnabled(self.clone_remove_combo.count() > 0)
+        self._update_clone_setup_visibility()
+
+    def _choose_clone_sample(self):
+        start = self.window.last_browse_dir("clone_sample")
+        path, _ = QFileDialog.getOpenFileName(self, "Choose a Voice Sample", start, "WAV Audio (*.wav)")
+        if path:
+            self.window.remember_browse_dir("clone_sample", path)
+            self._clone_sample_path = Path(path)
+            self.clone_sample_label.setText(self._clone_sample_path.name)
+            self._update_clone_button()
+
+    def _update_clone_button(self):
+        name = self.clone_name_edit.text().strip()
+        invalid = bool(_CLONE_NAME_INVALID.search(name))
+        valid = bool(name) and not invalid
+        busy = self._clone_thread is not None
+        self.clone_btn.setEnabled(valid and self._clone_sample_path is not None and not busy)
+        if invalid:
+            self.clone_name_hint.setStyleSheet(status_qss(WARN))
+            self.clone_name_hint.setText('That name contains a character Windows paths cannot use: \\ / : * ? " < > |')
+        elif valid and _sanitize_clone_name(name) != name:
+            self.clone_name_hint.setStyleSheet(HINT_QSS)
+            self.clone_name_hint.setText(f"Will be cloned as: {_sanitize_clone_name(name)}")
+        else:
+            self.clone_name_hint.setText("")
+        # An empty label still reserves its layout line - collapse it entirely.
+        self.clone_name_hint.setVisible(bool(self.clone_name_hint.text()))
+
+    def _trigger_async_clone(self):
+        name = _sanitize_clone_name(self.clone_name_edit.text())
+        sample = self._clone_sample_path
+        if not name or not sample:
+            return
+        if name in tts_utils.PREDEFINED_POCKET_VOICES:
+            QMessageBox.critical(self, "Clone Error", f"'{name}' is a built-in voice; choose another name.")
+            return
+        model = _pocket_model(self.window)
+        dest = self.window.project_root / "state" / "user" / "pocket_voices" / name / "_model_states" / f"{model}.safetensors"
+        if dest.exists():
+            QMessageBox.critical(self, "Clone Error", f"A clone named '{name}' already exists for model {model}.")
+            return
+        exe = Path(sys.executable).parent / "pocket-tts.exe"
+        if not exe.is_file():
+            QMessageBox.critical(self, "Clone Error", f"pocket-tts.exe not found next to {sys.executable}.")
+            return
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        self._clone_auth_hint = False
+        self._clone_log_tail = []
+        self.clone_btn.setEnabled(False)
+        self.clone_status.setText("Clone Queue: Preparing clone...")
+        cmd = [str(exe), "export-voice", str(sample), str(dest), "--language", model]
+        self._clone_thread = FunctionThread(lambda: self._clone_job(cmd, dest), self)
+        self._clone_thread.log_line.connect(self._on_clone_log)
+        self._clone_thread.finished_ok.connect(lambda _r: self._clone_finished(None, name))
+        self._clone_thread.failed.connect(lambda err: self._clone_finished(err, name))
+        self._clone_thread.start()
+
+    def _clone_job(self, cmd, dest):
+        create_no_window = 0x08000000 if sys.platform == "win32" else 0
+        # Scrub the runtime-offline flags: cloning needs the full gated model,
+        # which may not be in the redirected HF cache yet (one-time download).
+        env = dict(os.environ)
+        for flag in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
+            env.pop(flag, None)
+        tts_utils._ensure_pocket_cache_env(self.window.project_root)
+        env.setdefault("HF_HOME", str(self.window.project_root / "state" / "cache"))
+        hub_dir = self.window.project_root / "state" / "cache" / "hub"
+        env.setdefault("HF_HUB_CACHE", str(hub_dir))
+        env.setdefault("HUGGINGFACE_HUB_CACHE", str(hub_dir))
+        if not env.get("HF_TOKEN"):
+            token_file = Path.home() / ".cache" / "huggingface" / "token"
+            if token_file.is_file():
+                env["HF_TOKEN"] = token_file.read_text(encoding="utf-8").strip()
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            encoding="utf-8", errors="replace", creationflags=create_no_window, env=env,
+        )
+        for line in proc.stdout:
+            self._clone_thread.emit_log(line.rstrip())
+        proc.wait()
+        if proc.returncode != 0 or not dest.is_file():
+            raise RuntimeError(f"export-voice exited with code {proc.returncode}")
+
+    def _on_clone_log(self, line):
+        """GUI-side clone log: classify the phase for the status label and keep
+        a short tail for the failure dialog."""
+        self._clone_log_tail.append(line)
+        self._clone_log_tail = self._clone_log_tail[-6:]
+        lowered = line.lower()
+        if "%" in line and ("it/s" in lowered or "b/s" in lowered):
+            phase = "Downloading cloning model (one-time)..."
+        elif "loading ttsmodel weights" in lowered or "loading tokenizers" in lowered:
+            phase = "Loading the cloning model..."
+        elif "encoding audio prompt" in lowered:
+            phase = "Analyzing the sample voice..."
+        elif "prompting audio" in lowered or "size of the model state" in lowered:
+            phase = "Writing the voice state..."
+        else:
+            return
+        self.clone_status.setText(f"Clone Queue: {phase}")
+        if "voice cloning" in lowered:
+            self._clone_auth_hint = True
+
+    def _clone_finished(self, error, name):
+        self._clone_thread = None
+        self._update_clone_button()
+        if error is None:
+            self.clone_status.setText("Clone Queue: Voice ready.")
+            self._refresh_clone_list()
+            self.window.refresh_voices()
+            QMessageBox.information(
+                self, "Success",
+                f"Cloned voice '{name}' is ready.\n\n"
+                "Select it in the Voice Modifier tab and press Apply Changes\n"
+                "to make it your suit's voice.",
+            )
+        else:
+            self.clone_status.setText("Clone Queue: Failed.")
+            tail = "\n".join(self._clone_log_tail[-4:])
+            hint = ""
+            if self._clone_auth_hint:
+                self.clone_setup_group.setVisible(True)  # one click from fixed
+                hint = ("\n\nPress 'Sign in & Preload Model' in System Environment\n"
+                        "(one-time Hugging Face sign-in), then retry.")
+            QMessageBox.critical(
+                self, "Clone Failed",
+                f"Cloning '{name}' failed:\n{error}\n\nLast log lines:\n{tail}{hint}",
+            )
+
+    def _voice_setup_emit(self, message: str):
+        """Thread-safe phase text into the clone status label."""
+        if self._voice_setup_thread is not None:
+            self._voice_setup_thread.emit_log(str(message)[:160])
+
+    def _trigger_voice_setup(self):
+        """One-time Hugging Face sign-in + cloning-model preload."""
+        if self._voice_setup_thread is not None:
+            return
+        self.voice_setup_btn.setEnabled(False)
+        self.clone_status.setText("Setup: opening the Hugging Face sign-in window...")
+        self._voice_setup_thread = FunctionThread(self._voice_setup_job, self)
+        self._voice_setup_thread.log_line.connect(self.clone_status.setText)
+        self._voice_setup_thread.finished_ok.connect(lambda _r: self._voice_setup_finished(None))
+        self._voice_setup_thread.failed.connect(self._voice_setup_finished)
+        self._voice_setup_thread.start()
+
+    def _voice_setup_job(self):
+        py_exe = Path(sys.executable).with_name("python.exe")
+        if not py_exe.is_file():
+            py_exe = Path(sys.executable)
+        # 1. Interactive login in its own console (the manager runs windowless).
+        self._voice_setup_emit("A sign-in window has opened - paste your Hugging Face access token there.")
+        proc = subprocess.Popen(
+            [str(py_exe), "-m", "huggingface_hub.commands.huggingface_cli", "login"],
+            cwd=str(self.window.project_root),
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+        rc = proc.wait()
+        if rc != 0:
+            self._voice_setup_emit(f"Sign-in window exited with code {rc} (you can retry).")
+        # 2. Bridge the token into the project HF cache (HF_HOME-derived token path).
+        sys_tok = Path.home() / ".cache" / "huggingface" / "token"
+        loc_tok = self.window.project_root / "state" / "cache" / "token"
+        if sys_tok.is_file() and not loc_tok.exists():
+            loc_tok.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(sys_tok, loc_tok)
+        self._voice_setup_emit("Token saved for cloning.")
+        # 3. Preload the pinned cloning model into the project cache (streams progress).
+        model_key = _pocket_model(self.window)
+        root = self.window.project_root
+        code = (
+            "import os; from pathlib import Path; "
+            f"root = Path({str(root)!r}); p = root / 'state' / 'cache'; "
+            "os.environ['HF_HOME'] = str(p); "
+            "os.environ['HF_HUB_CACHE'] = str(p / 'hub'); "
+            "os.environ['HUGGINGFACE_HUB_CACHE'] = str(p / 'hub'); "
+            "from pocket_tts import TTSModel; "
+            f"TTSModel.load_model(language={model_key!r}); print('Cloning model ready.')"
+        )
+        env = dict(os.environ)
+        for flag in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
+            env.pop(flag, None)
+        tts_utils._ensure_pocket_cache_env(root)
+        if not env.get("HF_TOKEN") and sys_tok.is_file():
+            env["HF_TOKEN"] = sys_tok.read_text(encoding="utf-8").strip()
+        proc = subprocess.Popen(
+            [str(py_exe), "-c", code],
+            cwd=str(root), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace",
+            creationflags=0x08000000 if sys.platform == "win32" else 0,
+        )
+        for line in proc.stdout:
+            if line.strip():
+                self._voice_setup_emit(line.rstrip())
+        proc.wait()
+        if proc.returncode != 0:
+            raise RuntimeError(f"Model preload failed (exit code {proc.returncode})")
+
+    def _voice_setup_finished(self, error):
+        self._voice_setup_thread = None
+        self.voice_setup_btn.setEnabled(True)
+        if error is None:
+            self.clone_status.setText("Setup Queue: Sign-in and model preload complete.")
+            QMessageBox.information(
+                self, "Success",
+                "Hugging Face sign-in saved and the cloning model is preloaded.\n"
+                "Clone Voice is ready to run fully offline from here on.")
+            self._refresh_clone_list()
+            self.window.refresh_voices()
+        else:
+            self.clone_status.setText("Setup Queue: Failed.")
+            QMessageBox.critical(self, "Setup Failed", f"Voice cloning setup failed:\n{error}")
+
+    def _rename_custom_voice(self):
+        """Rename a cloned voice folder; the active voice (config + active rack) follows."""
+        old = self.clone_remove_combo.currentData()
+        if not old:
+            return
+        new, ok = QInputDialog.getText(self, "Rename Clone", "New name:", text=old)
+        if not ok:
+            return
+        new = _sanitize_clone_name(new)
+        if not new or new == old:
+            return
+        voices_root = Path(self.window.project_root) / "state" / "user" / "pocket_voices"
+        dest = voices_root / new
+        if dest.exists():
+            QMessageBox.critical(self, "Rename Clone", f"A voice named '{new}' already exists.")
+            return
+        try:
+            (voices_root / old).rename(dest)
+        except OSError as e:
+            QMessageBox.critical(self, "Rename Clone", f"Could not rename the voice folder:\n{e}")
+            return
+        if self.window.user_data.get("tts_voice") == old:
+            self.window.user_data["tts_voice"] = new
+            try:
+                self.window.user_config_file.write_text(
+                    json.dumps(self.window.user_data, indent=4), encoding="utf-8"
+                )
+            except OSError:
+                pass
+        active_file = self.window.project_root / "state" / "user" / "active_eqfx.json"
+        if active_file.exists():
+            try:
+                data = json.loads(active_file.read_text(encoding="utf-8"))
+                if isinstance(data, dict) and data.get("tts_voice") == old:
+                    data["tts_voice"] = new
+                    active_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
+            except (OSError, ValueError):
+                pass
+        self._refresh_clone_list()
+        self.window.refresh_voices()
+        self.clone_status.setText(f"Clone Queue: '{old}' renamed to '{new}'.")
+
+    def _remove_custom_voice(self):
+        key = self.clone_remove_combo.currentData()
+        if not key:
+            return
+        if QMessageBox.question(
+            self, "Confirm Deletion",
+            f"Permanently delete the cloned voice '{key}' from\n"
+            f"state/user/pocket_voices/?\n\nThis cannot be undone.",
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            voice_folder = Path(self.window.project_root) / "state" / "user" / "pocket_voices" / key
+            if voice_folder.exists():
+                shutil.rmtree(voice_folder)
+            self._refresh_clone_list()
+            self.window.refresh_voices()
+            QMessageBox.information(self, "Success", "Cloned voice removed cleanly.")
+        except Exception as e:
+            QMessageBox.critical(self, "Purge Failure", f"Could not remove voice folder modules: {e}")
 
     # -------------------------------------------------------------- purge
     def _purge_audio_cache(self):

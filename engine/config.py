@@ -84,7 +84,7 @@ CUSTOMIZATION_DEFAULTS = {
         "ring_mix": 100,
         "pitch_semitones": 4,
         "formant_percent": 80,
-        "loudness_target": -16.0,
+        "loudness_target": -10.0,
         "loudness_true_peak": 5.0,
     },
 }
@@ -219,6 +219,13 @@ class SuitVoiceConfig:
         # Audio effect mapping dict for processing pipeline reference
         self.voice_effects = self.customization.get("voice_effects", {})
 
+        # Active render preset (eqfx rack + delivery); falls back to a mapping of the sliders.
+        self.eqfx_active = load_json(root_dir / "state" / "user" / "active_eqfx.json")
+        if not isinstance(self.eqfx_active, dict) or not self.eqfx_active:
+            from engine.audio_chain import preset_from_legacy
+
+            self.eqfx_active = preset_from_legacy(self.voice_effects)
+
         # FFMPEG Binary Resolution
         ext_cfg = self.environment.get("external_tools", {})
         ffmpeg_path = shutil.which("ffmpeg")
@@ -304,6 +311,7 @@ class SuitVoiceConfig:
         """Newest mtime across the live-editable settings files (0.0 if none exist)."""
         candidates = [
             self.user_customization_path,
+            self.root_dir / "state" / "user" / "active_eqfx.json",
             prompt_presets.presets_path(self.root_dir),
         ]
         mtimes = [p.stat().st_mtime for p in candidates if p.is_file()]
@@ -371,6 +379,15 @@ class SuitVoiceConfig:
         new_effects = self.customization.get("voice_effects", {})
         _track("audio effects", self.voice_effects, new_effects)
         self.voice_effects = new_effects
+
+        # Active render preset (eqfx rack); the manager's Apply Changes lands here live.
+        new_preset = load_json(self.root_dir / "state" / "user" / "active_eqfx.json")
+        if not isinstance(new_preset, dict) or not new_preset:
+            from engine.audio_chain import preset_from_legacy
+
+            new_preset = preset_from_legacy(self.customization.get("voice_effects", {}))
+        _track("audio preset", self.eqfx_active, new_preset)
+        self.eqfx_active = new_preset
 
         new_voice = self.customization.get("tts_voice", tts_utils.POCKET_DEFAULT_VOICE)
         _track("voice", self.tts_voice, new_voice)

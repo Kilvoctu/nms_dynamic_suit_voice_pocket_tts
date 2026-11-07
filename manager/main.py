@@ -76,6 +76,7 @@ def _main() -> None:
     from PySide6.QtWidgets import QApplication, QMessageBox
 
     from ui.main_window import MainWindow
+    from ui.style import APP_QSS
 
     expected_dir = (Path(__file__).parent.parent / "venv" / "Scripts").resolve()
     if Path(sys.executable).resolve().parent != expected_dir:
@@ -117,6 +118,7 @@ def _main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("NMS Dynamic Suit Voice")
     app.setWindowIcon(QIcon(str(Path(__file__).parent.parent / "assets" / "nms_dsv.png")))
+    app.setStyleSheet(APP_QSS)  # group-box bevels + slim scrollbars, app-wide
     _boot_log("QApplication created")
 
     lock = _acquire_instance_lock()

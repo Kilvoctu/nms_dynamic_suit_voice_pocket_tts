@@ -21,48 +21,16 @@ from PySide6.QtWidgets import (
 
 from engine.config import ENVIRONMENT_DEFAULTS
 from engine.path_utils import is_pipeline_running
+from ui.style import WARN
 from ui.pipeline_bar import _CLOSE_FORCE_AFTER_S, PipelineBar
 from ui.tabs_audio import AudioTab
 from ui.tabs_profile import ProfileTab
 from ui.tabs_system import SystemTab
-from ui.tabs_voice import VoiceModelTab
 from ui.title_bar import TitleBar
 
 _DWMWA_WINDOW_CORNER_PREFERENCE = 33
 _DWMWCP_ROUND = 2
 _RESIZE_MARGIN = 8
-
-_DARK_QSS = """
-#dsvTitleBar { background-color: #1c1c1c; }
-QMainWindow, QWidget { background-color: #202020; color: #E6E6E6; font-size: 9pt; }
-QGroupBox {
-    border: 1px solid #3a3a3a; border-radius: 6px; margin-top: 10px;
-    font-weight: bold; color: #E6E6E6;
-}
-QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #9fc3e8; }
-QLineEdit, QPlainTextEdit, QComboBox, QSpinBox, QDoubleSpinBox {
-    background-color: #2b2b2b; color: #E6E6E6; border: 1px solid #3f3f3f;
-    border-radius: 4px; padding: 3px;
-}
-QPushButton {
-    background-color: #333333; color: #E6E6E6; border: 1px solid #454545;
-    border-radius: 4px; padding: 5px 14px;
-}
-QPushButton:hover { background-color: #3d3d3d; }
-QPushButton:pressed { background-color: #2a2a2a; }
-QPushButton:disabled { color: #777777; }
-QComboBox QAbstractItemView { background-color: #2b2b2b; color: #E6E6E6; selection-background-color: #0d5c9c; }
-QListWidget { background-color: #262626; color: #E6E6E6; border: 1px solid #3a3a3a; border-radius: 4px; }
-QTabWidget::pane { border: 1px solid #3a3a3a; border-radius: 4px; }
-QTabBar::tab {
-    background-color: #2b2b2b; color: #bbbbbb; padding: 6px 16px;
-    border-top-left-radius: 4px; border-top-right-radius: 4px;
-}
-QTabBar::tab:selected { background-color: #202020; color: #ffffff; border-bottom: 2px solid #5fb8ff; }
-QToolTip { background-color: #2b2b2b; color: #E6E6E6; border: 1px solid #555555; }
-#pipelineBar { background-color: #1c1c1c; border-top: 1px solid #3a3a3a; }
-QCheckBox::indicator, QSpinBox::up-button, QSpinBox::down-button { width: 14px; }
-"""
 
 
 class MainWindow(QMainWindow):
@@ -101,7 +69,7 @@ class MainWindow(QMainWindow):
             banner = QLabel(
                 "Setup required - in System Environment tab, enter your No Man's Sky mod directory and press Setup."
             )
-            banner.setStyleSheet("color: #FBBF24; font-weight: bold; padding: 8px;")
+            banner.setStyleSheet(f"color: {WARN}; font-weight: bold; padding: 8px;")
             banner.setWordWrap(True)
             root_layout.addWidget(banner)
 
@@ -112,8 +80,7 @@ class MainWindow(QMainWindow):
             self.tabs.addTab(SystemTab(self), "System Environment")
         else:
             self.tabs.addTab(ProfileTab(self), "User Profile")
-            self.tabs.addTab(AudioTab(self), "Audio Modifiers")
-            self.tabs.addTab(VoiceModelTab(self), "Voice Model")
+            self.tabs.addTab(AudioTab(self), "Voice Modifier")
             self.tabs.addTab(SystemTab(self), "System Environment")
 
         self.pipeline_bar = PipelineBar(self)
@@ -125,8 +92,8 @@ class MainWindow(QMainWindow):
         self.pipeline_bar.add_tail(apply_btn)
 
         self.setCentralWidget(central)
-        self.resize(860, 640)
-        self.setMinimumSize(860, 640)
+        self.resize(860, 660)
+        self.setMinimumSize(860, 660)
         self._load_window_state()
 
         # Win11 rounded corners
@@ -173,28 +140,11 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-    def refresh_voice_highlight(self):
-        """Re-render the Voice Model tab's active-voice highlight (the committed state becomes the truth)."""
-        voice_tab = self.tabs.widget(2) if not self.setup_pending else None
-        if voice_tab is not None and hasattr(voice_tab, "_refresh_catalog"):
-            voice_tab._refresh_catalog()
-
-    def audition_voice(self) -> str:
-        """The voice the audio sandbox should render with: the voice tab's roster
-        selection (possibly not yet committed), else the committed active voice."""
-        voice_tab = self.tabs.widget(2) if not self.setup_pending else None
-        if voice_tab is not None:
-            key = voice_tab._selected_key()
-            if key:
-                return key
-        return self.user_data.get("tts_voice", "")
-
-    def select_voice_in_roster(self, key: str) -> bool:
-        """Move the Voice Model tab's roster selection to key (preset voice switches)."""
-        voice_tab = self.tabs.widget(2) if not self.setup_pending else None
-        if voice_tab is None or not hasattr(voice_tab, "_select_by_key"):
-            return False
-        return voice_tab._select_by_key(key)
+    def refresh_voices(self):
+        """Re-sync the Voice Modifier tab's voice dropdown (clones added or removed elsewhere)."""
+        audio_tab = self.tabs.widget(1) if not self.setup_pending else None
+        if audio_tab is not None and hasattr(audio_tab, "refresh_voices"):
+            audio_tab.refresh_voices()
 
     def save_and_continue_settings(self):
         old_variant = str(self.user_data.get("models", {}).get("llm_variant", "e2b")).lower()
@@ -213,10 +163,9 @@ class MainWindow(QMainWindow):
 
     def _execute_file_save_matrix(self):
         """Compile the tab widgets back into the JSON config files."""
-        system_tab = self.tabs.widget(0) if self.setup_pending else self.tabs.widget(3)
+        system_tab = self.tabs.widget(0) if self.setup_pending else self.tabs.widget(2)
         profile_tab = None if self.setup_pending else self.tabs.widget(0)
         audio_tab = None if self.setup_pending else self.tabs.widget(1)
-        voice_tab = None if self.setup_pending else self.tabs.widget(2)
 
         # environment config: tracked defaults only. Personal mod dir + runtime
         # overrides go into the UNTRACKED user config (never into a tracked file).
@@ -252,15 +201,15 @@ class MainWindow(QMainWindow):
                 profile_tab.base_combo.currentText() or prompt_presets.ACTIVE_DEFAULT)
             prompt_presets.save_presets(self.project_root, presets)
         if audio_tab is not None:
-            fx = updated.get("voice_effects", {})
-            fx.update(audio_tab._slider_values())
-            updated["voice_effects"] = fx
-        if voice_tab is not None:
-            # Commit the voice tab's selection (a fresh roster pick or a preset-switched one).
-            updated["tts_voice"] = voice_tab._selected_key() or updated.get("tts_voice", "fantine")
+            # Commit the voice dropdown (a fresh pick or a preset-switched one) and
+            # the active render preset bound to it. The engine live-reloads the
+            # preset file (settings_mtime) and the era sweep re-records.
+            updated["tts_voice"] = audio_tab.current_voice() or updated.get("tts_voice", "fantine")
+            # The volume trim rides inside the committed rack (commit_active_preset), not here.
+            audio_tab.commit_active_preset(updated.get("tts_voice", ""))
         self.user_config_file.write_text(json.dumps(updated, indent=4), encoding="utf-8")
-        if voice_tab is not None:
-            self.refresh_voice_highlight()  # move the ACTIVE marker to the committed voice
+        if audio_tab is not None:
+            self.refresh_voices()
 
     # ------------------------------------------------- tray icon
     def _setup_tray_icon(self):

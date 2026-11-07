@@ -1,12 +1,20 @@
 # engine/audio_chain.py
 """In-memory numpy render chain: float32 array-in/array-out, no disk I/O, no subprocesses.
-Sculpt -> gain -> tempo (Praat) -> rate shift -> BS.1770 loudness -> 22050 Hz container."""
+Order: upsample to the 40 kHz FX canvas -> speed/pitch (Praat) -> parametric EQ -> FX pre-stage ->
+BS.1770 loudness -> FX post-stage (limiter) -> 48000 Hz stereo container (genuine vanilla wem format;
+wem_utils patches the encoded fmt's mask/GUID so the game's decoder plays it).
+EQ + FX rack units live in engine.fx."""
 import numpy as np
 
-WEM_ENCODER_COMPENSATION_DB = 0.9  # wav2wem loses ~0.9 LU in encode; pre-empt it
+from engine import fx
+
+WEM_ENCODER_COMPENSATION_DB = 0.4  # wav2wem encode cost ~0.3-0.4 LU by content; lands encoded within ~0.1 dB of target
 MIN_SAMPLES = 100
-CONTAINER_SR = 22050  # the game/wem contract: final renders land at this rate
-CHAIN_VERSION = 2  # bump to force a re-record sweep when the render chain's sound changes
+CONTAINER_SR = 48000
+_FX_SR = 40000
+CHAIN_VERSION = 8  # bump to force a re-record sweep when the render chain's sound changes
+_FX_TAIL_LEAD_SEC = 0.25
+_FX_TAIL_REAR_SEC = 0.5
 
 
 def _resample(y, n):
@@ -25,7 +33,12 @@ def soft_clip(x):
 
 
 def _prepare_lufs_input(y, sr, min_duration_sec=0.4):
-    """Tile short audio so the LUFS meter gets a valid measurement window."""
+    """Mono-downmix multichannel input (one loudness convention everywhere), and tile
+    short audio so the LUFS meter gets a valid measurement window."""
+    y = np.asarray(y)
+    if y.ndim > 1:
+        y = y.mean(axis=1)
+    y = np.asarray(y, dtype=np.float32)
     min_samples = max(1, int(min_duration_sec * sr))
     if 0 < len(y) < min_samples:
         return np.tile(y, int(np.ceil(min_samples / len(y))))[:min_samples]
@@ -44,55 +57,52 @@ def integrated_loudness(y, sr) -> float:
         return -70.0
 
 
-def apply_sculpt(y, sr, fx):
-    """The suit-voice sculpt: pitch/formant resamples and the ring-mod overlay.
-    No-op stages (pitch 0, formant 100%, ring mix 0) are skipped entirely."""
-    pitch = float(fx.get("pitch_semitones", 0) or 0)
-    if abs(pitch) > 1e-9:
-        y = _resample(y, len(y) / (2 ** (pitch / 12)))
-    formant = float(fx.get("formant_percent", 100) or 100)
-    if abs(formant - 100) > 1e-9:
-        y = _resample(y, len(y) / (formant / 100))
-    ring_mix = float(fx.get("ring_mix", 0) or 0)
-    if ring_mix > 0:
-        t = np.arange(len(y), dtype=np.float64) / sr
-        wet = y * np.sin(2 * np.pi * float(fx.get("ring_freq", 300)) * t)
-        y = y * (1 - ring_mix / 100) + wet * (ring_mix / 100)
-    return np.asarray(y, dtype=np.float32)
+def _fx_has_tail(rack: dict) -> bool:
+    """True if the sanitized rack has a slot producing sound beyond the input length."""
+    if rack["reverb"]["enabled"]:
+        return True
+    e = rack["echo"]
+    return bool(e["enabled"] and (float(e["feedback"]) > 0.0 or e["taps_ms"]))
 
 
-def apply_speed_rate(y, sr, fx):
-    """Tempo via Praat lengthen (pitch-preserving). Rate slider sets the
-    effective stream rate to 44100*rate (24 kHz source is pitch-neutral at ~0.544)."""
-    tempo = float(fx.get("tempo", 1.0) or 1.0)
-    if abs(tempo - 1.0) > 1e-9:
-        try:
-            import parselmouth
+def _pad_for_fx_tail(y: np.ndarray, sr: int, rack: dict) -> np.ndarray:
+    """Prepend/append silence headroom so reverb/echo tails ring out unabridged."""
+    if not _fx_has_tail(rack) or y.size == 0 or sr <= 0:
+        return y
+    if float(np.max(np.abs(y))) < 1e-5:
+        return y
+    lead = int(round(_FX_TAIL_LEAD_SEC * sr))
+    rear = int(round(_FX_TAIL_REAR_SEC * sr))
+    return np.pad(y, (lead, rear), mode="constant")
 
+
+def _speed_pitch(y, sr, speed: float, pitch_st: float):
+    """Praat-based pitch shift (duration restored) and tempo stretch; degrades
+    gracefully to unmodified audio if the engine fails."""
+    try:
+        import parselmouth
+
+        if abs(pitch_st) > 1e-9:
+            factor = 2 ** (pitch_st / 12)
+            y = _resample(y, len(y) / factor)  # pitch up, duration down
             sound = parselmouth.Sound(np.asarray(y, dtype=np.float64), sampling_frequency=sr)
-            stretched = sound.lengthen(75.0, 600.0, 1.0 / tempo)
-            y = np.asarray(stretched.values, dtype=np.float32).flatten()
-        except Exception as exc:
-            print(f"[Chain] Tempo stretch skipped ({exc}); continuing unstretched.")
-    rate = float(fx.get("rate", 1.0) or 1.0)
-    if abs(rate - 1.0) > 1e-9 and rate > 0:
-        target_sr = int(44100 * rate)
-        if abs(target_sr - sr) > 1e-6 * sr:
-            y = _resample(y, len(y) * CONTAINER_SR / target_sr)
-        sr = CONTAINER_SR
+            y = np.asarray(sound.lengthen(75.0, 600.0, factor).values, dtype=np.float32).flatten()
+        if abs(speed - 1.0) > 1e-9:
+            sound = parselmouth.Sound(np.asarray(y, dtype=np.float64), sampling_frequency=sr)
+            y = np.asarray(sound.lengthen(75.0, 600.0, 1.0 / speed).values, dtype=np.float32).flatten()
+    except Exception as exc:
+        print(f"[Chain] Speed/pitch skipped ({exc}); continuing unmodified.")
     return np.asarray(y, dtype=np.float32), sr
 
 
-def normalize_loudness(y, sr, fx):
+def _normalize_loudness(y, sr, target: float, true_peak: float):
     """Iterative gain toward the LUFS target (+encoder compensation) with the
-    2 dB-headroom brickwall; limiting steals loudness, so re-measure up to 5 passes."""
-    target = float(fx.get("loudness_target", -5.0))
-    sample_ceiling = max(abs(float(fx.get("loudness_true_peak", 5.0))) - 2.0, 0.0)
+    2 dB-headroom soft-clip ceiling; limiting steals loudness, so re-measure."""
+    sample_ceiling = max(abs(true_peak) - 2.0, 0.0)
     down = 10 ** (-sample_ceiling / 20)
     up = 10 ** (sample_ceiling / 20)
     for _ in range(5):
-        measured = integrated_loudness(y, sr)
-        gain_db = target - measured + WEM_ENCODER_COMPENSATION_DB
+        gain_db = target - integrated_loudness(y, sr) + WEM_ENCODER_COMPENSATION_DB
         if abs(gain_db) <= 0.4:
             break
         gain_db = float(np.clip(gain_db, -12.0, 12.0))
@@ -100,20 +110,58 @@ def normalize_loudness(y, sr, fx):
     return np.asarray(y, dtype=np.float32)
 
 
-def render_chain(audio, sr, fx):
-    """The full render chain on one float32 array: sculpt -> gain -> tempo ->
-    rate shift -> loudness -> 22050 Hz container. Returns (y, sr)."""
+def render_chain(audio, sr, preset, loudness_target=None, true_peak=5.0):
+    """Full render chain: upsample to the 40 kHz FX canvas -> speed/pitch (Praat) -> parametric EQ ->
+    FX pre-stage -> BS.1770 loudness -> FX post-stage (limiter) -> 48000 Hz stereo container.
+    preset: {"speed", "pitch_st", "volume", "eq_bands", "fx"} - fx.sanitize_* makes it safe.
+    "volume" is a per-preset dB trim on top of `loudness_target` (0 = no trim)."""
+    if loudness_target is None:
+        from engine.config import CUSTOMIZATION_DEFAULTS
+
+        loudness_target = float(CUSTOMIZATION_DEFAULTS["voice_effects"]["loudness_target"])
     y = np.asarray(audio, dtype=np.float32).reshape(-1)
     if len(y) < MIN_SAMPLES:
         y = np.pad(y, (0, MIN_SAMPLES - len(y)))
-    y = apply_sculpt(y, sr, fx)
-    y = y * (10 ** (float(fx.get("gain_db", 5) or 0) / 20))
-    y, sr = apply_speed_rate(y, sr, fx)
-    y = normalize_loudness(y, sr, fx)
+    preset = preset if isinstance(preset, dict) else {}
+
+    if sr != _FX_SR:  # synth arrives at 24 kHz; the rack was tuned against a 40 kHz canvas
+        y = _resample(y, len(y) * _FX_SR / sr)
+        sr = _FX_SR
+
+    y, sr = _speed_pitch(y, sr, float(preset.get("speed", 1.0) or 1.0),
+                         float(preset.get("pitch_st", 0.0) or 0.0))
+    eq_bands = fx.sanitize_eq_bands(preset.get("eq_bands"), nyquist=sr / 2.0)
+    if eq_bands:
+        y = fx.parametric_eq(y, sr, eq_bands)
+    rack = fx.sanitize_fx(preset.get("fx"), nyquist=sr / 2.0)
+    y = _pad_for_fx_tail(y, sr, rack)
+    y = fx.apply_fx_settings(y, sr, rack, "pre")
+    try:
+        trim = float(preset.get("volume", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        trim = 0.0
+    y = _normalize_loudness(y, sr, float(loudness_target) + float(np.clip(trim, -10.0, 10.0)),
+                            float(true_peak))
+    y = fx.apply_fx_settings(y, sr, rack, "post")
     if sr != CONTAINER_SR:
         y = _resample(y, len(y) * CONTAINER_SR / sr)
         sr = CONTAINER_SR
-    return np.asarray(y, dtype=np.float32), sr  # float32 container: >1.0 peaks are legal
+    y = np.ascontiguousarray(np.stack([y, y], axis=1))  # vanilla wems are stereo
+    return np.asarray(y, dtype=np.float32), sr
+
+
+def preset_from_legacy(fx_dict) -> dict:
+    """Map the old slider block onto a preset: the resample cascade's net pitch
+    and pace, EQ/FX retired. Keeps legacy configs sounding the same."""
+    fx_dict = fx_dict if isinstance(fx_dict, dict) else {}
+    pitch = float(fx_dict.get("pitch_semitones", 0) or 0)
+    formant = float(fx_dict.get("formant_percent", 100) or 100)
+    rate = float(fx_dict.get("rate", 1.0) or 1.0)
+    tempo = float(fx_dict.get("tempo", 1.0) or 1.0)
+    pitch_st = pitch + 12 * np.log2(max(formant, 1e-9) / 100) + 12 * np.log2(max(1.8375 * rate, 1e-9))
+    duration = (2 ** (-pitch / 12)) * (100 / max(formant, 1e-9)) * (24000 / (44100 * max(rate, 1e-9))) / max(tempo, 1e-9)
+    return {"speed": round(1.0 / duration, 4) if duration > 0 else 1.0,
+            "pitch_st": round(float(pitch_st), 3), "eq_bands": [], "fx": {}}
 
 
 def write_wav_float(path, y, sr):

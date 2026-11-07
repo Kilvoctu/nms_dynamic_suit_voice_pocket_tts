@@ -29,6 +29,7 @@ SWAP_GIVE_UP_S = 16  # per-attempt cap: the game normally frees a played wem in 
 _active_jobs_count = {}
 _gameplay_pending = {}
 _jobs_lock = threading.Lock()
+_gen_lock = threading.Lock()
 
 # Wave discipline: filler rounds wait until no sweep wave is mid-pass, then grow depth
 # one level at a time in line order, each round chained off the previous round's completion.
@@ -41,9 +42,14 @@ _publish_lock = threading.Lock()  # serialize sidecar writes so they can't go st
 
 
 def _settings_fingerprint(config) -> str:
-    """Short fingerprint of the current voice, effects, and phrasing-style era."""
+    """Short fingerprint of the current voice, render preset, and phrasing-style era."""
     try:
-        payload = json.dumps(getattr(config, "voice_effects", {}), sort_keys=True, default=str)
+        preset = getattr(config, "eqfx_active", None)
+        if not isinstance(preset, dict) or not preset:
+            from engine.audio_chain import preset_from_legacy
+
+            preset = preset_from_legacy(getattr(config, "voice_effects", {}))
+        payload = json.dumps(preset, sort_keys=True, default=str)
     except Exception:
         payload = "unknown"
     era = "|".join([
@@ -180,11 +186,12 @@ def start_worker():
         _rush_worker_thread.start()
 
 def _replacement_wrapper(config, wem_id: str, wem_dir: Path, rephrase: bool = True, priority: int = 10):
-    """Job body: reword via the LLM, then render + encode - sequentially, so a
-    fill job never runs its LLM and TTS stages against each other."""
-    reworded = rephrase_replacement_line(config, wem_id, rephrase=rephrase)
-    if reworded is not None:
-        render_replacement_line(config, wem_id, wem_dir, reworded)
+    """Job body: reword via the LLM, then render + encode - sequentially, and under
+    the gen lock so the two lanes never run LLM or TTS stages against each other."""
+    with _gen_lock:
+        reworded = rephrase_replacement_line(config, wem_id, rephrase=rephrase)
+        if reworded is not None:
+            render_replacement_line(config, wem_id, wem_dir, reworded)
 
 
 # --- Restart Manager plumbing: name the process(es) holding a file open at swap give-up ---

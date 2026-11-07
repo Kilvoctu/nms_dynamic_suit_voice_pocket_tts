@@ -1,4 +1,4 @@
-# manager/ui/preset_manager.py - unified prompt preset manager with combination test.
+﻿# manager/ui/preset_manager.py - unified prompt preset manager with combination test.
 import json
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from engine import prompt_presets
+from ui.style import DIM, ERROR, GOOD, HINT_QSS, WARN, status_qss
 from ui.workers import FunctionThread
 
 # Meta-instruction for "Distill Chat Persona": turns a long interactive-companion
@@ -194,7 +195,7 @@ class PresetSectionEditor(QWidget):
         self.prompt_edit = QPlainTextEdit()
         form.addWidget(self.prompt_edit, 1)
         self.hint_label = QLabel("")
-        self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.hint_label.setStyleSheet(HINT_QSS)
         self.hint_label.setWordWrap(True)
         form.addWidget(self.hint_label)
         body.addWidget(pane, 2)
@@ -236,7 +237,7 @@ class PresetSectionEditor(QWidget):
         for name in self.builtin:
             self.list_widget.addItem(f"{name}  (built-in)")
             item = self.list_widget.item(self.list_widget.count() - 1)
-            item.setForeground(QColor("#8a8a8a"))
+            item.setForeground(QColor(DIM))
         for name in self.presets.get(self.section, {}):
             self.list_widget.addItem(name)
             if name == select:
@@ -272,7 +273,7 @@ class PresetSectionEditor(QWidget):
         self.dup_btn.setEnabled(bool(name))
         if builtin_mode:
             self.hint_label.setText("Built-in preset - duplicate to customize.")
-            self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+            self.hint_label.setStyleSheet(HINT_QSS)
         else:
             self.hint_label.setText("")
         self.current = "" if builtin_mode else name
@@ -401,7 +402,7 @@ class PresetSectionEditor(QWidget):
             error = "Prompt cannot be empty."
         if error:
             self.hint_label.setText(error)
-            self.hint_label.setStyleSheet("color: #F87171; font-style: italic;")
+            self.hint_label.setStyleSheet(status_qss(ERROR))
             return
         self.presets.setdefault(self.section, {})[name] = {
             "prompt": prompt,
@@ -411,7 +412,7 @@ class PresetSectionEditor(QWidget):
         prompt_presets.save_presets(self.project_root, self.presets)
         self._reload_list(select=name)
         self.hint_label.setText("Saved to user/prompt_presets.json.")
-        self.hint_label.setStyleSheet("color: #4ADE80; font-style: italic;")
+        self.hint_label.setStyleSheet(status_qss(GOOD))
 
     def _on_delete(self):
         """Remove the selected user preset after a confirmation prompt."""
@@ -579,7 +580,7 @@ class CombinationTestTab(QWidget):
         root.addWidget(self.output_view, 1)
 
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.status_label.setStyleSheet(HINT_QSS)
         self.status_label.setWordWrap(True)
         root.addWidget(self.status_label)
 
@@ -640,7 +641,7 @@ class CombinationTestTab(QWidget):
             self.status_label.setText("Select a category and phrase first.")
             return
         self.generate_btn.setEnabled(False)
-        self.status_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.status_label.setStyleSheet(HINT_QSS)
         self.status_label.setText("Preparing...")
         self._thread = FunctionThread(lambda: self._generate_job(entry), self)
         self._thread.log_line.connect(lambda msg: self.status_label.setText(msg))
@@ -672,13 +673,13 @@ class CombinationTestTab(QWidget):
 
     def _on_generated(self, text):
         self.output_view.setPlainText(text)
-        self.status_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.status_label.setStyleSheet(HINT_QSS)
         self.status_label.setText("Prompt preview updated - the generated line joined the uniqueness list.")
         self._update_preview()  # the session dedup list grew; show next prompt's state
         self.generate_btn.setEnabled(True)
 
     def _on_generate_failed(self, error):
-        self.status_label.setStyleSheet("color: #F87171; font-style: italic;")
+        self.status_label.setStyleSheet(status_qss(ERROR))
         self.status_label.setText(f"Generation failed: {error}")
         self.generate_btn.setEnabled(True)
 
@@ -725,7 +726,7 @@ class BasePromptEditor(PresetSectionEditor):
             "WARNING: The core prompt defines the suit's core behavior and shapes EVERY line it speaks. "
             "Changes here have a much larger effect than tone or verbiage presets."
         )
-        warn.setStyleSheet("color: #FBBF24; font-style: italic;")
+        warn.setStyleSheet(status_qss(WARN))
         warn.setWordWrap(True)
         return warn
 
@@ -753,7 +754,7 @@ class BasePromptEditor(PresetSectionEditor):
         for name in self.builtin:
             marker = "\u2605 " if name == active else ""
             self.list_widget.addItem(f"{marker}{name}  (built-in)")
-            self.list_widget.item(self.list_widget.count() - 1).setForeground(QColor("#8a8a8a"))
+            self.list_widget.item(self.list_widget.count() - 1).setForeground(QColor(DIM))
         for name in self.presets.get(self.section, {}):
             marker = "\u2605 " if name == active else ""
             self.list_widget.addItem(f"{marker}{name}")
@@ -786,7 +787,7 @@ class BasePromptEditor(PresetSectionEditor):
         self.dup_btn.setEnabled(bool(name))
         if builtin_mode:
             self.hint_label.setText("Built-in core prompt - duplicate to customize.")
-            self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+            self.hint_label.setStyleSheet(HINT_QSS)
         else:
             self.hint_label.setText("")
         self.current = "" if builtin_mode else name
@@ -809,7 +810,7 @@ class BasePromptEditor(PresetSectionEditor):
             error = "Base prompt text cannot be empty."
         if error:
             self.hint_label.setText(error)
-            self.hint_label.setStyleSheet("color: #F87171; font-style: italic;")
+            self.hint_label.setStyleSheet(status_qss(ERROR))
             return
         self.presets.setdefault(self.section, {})[name] = {
             "text": text,
@@ -819,7 +820,7 @@ class BasePromptEditor(PresetSectionEditor):
         prompt_presets.save_presets(self.project_root, self.presets)
         self._reload_list(select=name)
         self.hint_label.setText("Saved to user/prompt_presets.json.")
-        self.hint_label.setStyleSheet("color: #4ADE80; font-style: italic;")
+        self.hint_label.setStyleSheet(status_qss(GOOD))
 
     # --------------------------------------------------------------- actions
     def _after_delete(self, name: str):
@@ -849,7 +850,7 @@ class BasePromptEditor(PresetSectionEditor):
             f"Core prompt set to {self.presets[prompt_presets.BASE_ACTIVE_KEY]} - "
             "takes effect when you press Apply Changes."
         )
-        self.hint_label.setStyleSheet("color: #4ADE80; font-style: italic;")
+        self.hint_label.setStyleSheet(status_qss(GOOD))
 
     # ------------------------------------------------------------- distill
     def _on_distill(self):
@@ -886,7 +887,7 @@ class BasePromptEditor(PresetSectionEditor):
         self.name_edit.setText(persona_name)
         self.desc_edit.setText(f"Distilled from {persona_path.name}")
         self.prompt_edit.clear()
-        self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+        self.hint_label.setStyleSheet(HINT_QSS)
         self.hint_label.setText("Preparing...")
         self._distill_thread = FunctionThread(lambda: self._distill_job(persona_text), self)
         self._distill_thread.log_line.connect(self._on_distill_log)
@@ -991,9 +992,9 @@ class BasePromptEditor(PresetSectionEditor):
             return
         if message.startswith("\x02"):
             message = message[1:]
-            self.hint_label.setStyleSheet("color: #FBBF24; font-style: italic;")
+            self.hint_label.setStyleSheet(status_qss(WARN))
         else:
-            self.hint_label.setStyleSheet("color: #8a8a8a; font-style: italic;")
+            self.hint_label.setStyleSheet(HINT_QSS)
         self.hint_label.setText(message)
 
     def _show_distill_preview(self, partial: str):
@@ -1023,7 +1024,7 @@ class BasePromptEditor(PresetSectionEditor):
         self._set_distill_ui_busy(False)
         self._set_pane_editable()  # the streaming preview ran read-only
         if error is not None:
-            self.hint_label.setStyleSheet("color: #F87171; font-style: italic;")
+            self.hint_label.setStyleSheet(status_qss(ERROR))
             self.hint_label.setText(f"Distill failed: {error}")
             return
         self.list_widget.blockSignals(True)
@@ -1037,7 +1038,7 @@ class BasePromptEditor(PresetSectionEditor):
         self.save_btn.setEnabled(True)
         self.delete_btn.setEnabled(False)
         self.dup_btn.setEnabled(False)
-        self.hint_label.setStyleSheet("color: #4ADE80; font-style: italic;")
+        self.hint_label.setStyleSheet(status_qss(GOOD))
         self.hint_label.setText("Review the distilled prompt, then press Save.")
         self._dirty = True  # the distilled result is unsaved until reviewed
 
@@ -1114,3 +1115,4 @@ class PresetManagerDialog(QDialog):
             return
         self.test_tab.release_model()
         super().done(result)
+

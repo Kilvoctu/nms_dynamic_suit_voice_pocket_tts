@@ -2,6 +2,9 @@
 import os
 import sys
 import socket
+import faulthandler
+
+faulthandler.enable()
 
 # ============ IMMEDIATE SINGLE-INSTANCE GUARD ============
 try:

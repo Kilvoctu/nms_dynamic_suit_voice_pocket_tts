@@ -373,21 +373,20 @@ class AudioTab(QWidget):
     def _audio_test_job(self):
         from engine.config import SuitVoiceConfig
         from engine import tts_utils
-        import numpy as np
-        from scipy.io import wavfile
-        from scipy.signal import resample
+        from engine.audio_chain import render_chain, write_wav_float
 
         inputs = getattr(self, "_test_inputs", {})
         text_payload = inputs.get("text_payload", "")
-        fx = inputs.get("fx", {})
+        fx = dict(inputs.get("fx", {}))
         voice = inputs.get("voice") or tts_utils.POCKET_DEFAULT_VOICE
 
         self._test_thread.emit_log(" Connecting to Pocket TTS Engine...")
         heavy_cfg = SuitVoiceConfig(init_llm=False)
+        fx.setdefault("loudness_target", float(heavy_cfg.voice_effects.get("loudness_target", -5.0)))
+        fx.setdefault("loudness_true_peak", float(heavy_cfg.voice_effects.get("loudness_true_peak", 5.0)))
 
         cache_dir = self.window.project_root / "state" / "cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        temp_wav = cache_dir / "sandbox_raw.wav"
         final_wav = cache_dir / "sandbox_processed.wav"
         self._test_thread.emit_log(f" Synthesizing vocal wave footprints ({voice})...")
         audio, sr = tts_utils.pocket_generate(
@@ -395,46 +394,16 @@ class AudioTab(QWidget):
             max_tokens=heavy_cfg.pocket_tts_max_tokens,
         )
 
-        self._test_thread.emit_log(" Injecting authentic local numpy robotic filter matrices...")
-        MIN_SAMPLES = 1000
-        audio = np.asarray(audio, dtype="float32")
+        self._test_thread.emit_log(" Injecting authentic local numpy robotic filter matrices (sculpt, tempo, rate, loudness)...")
+        audio, sr = render_chain(audio, sr, fx)
+        write_wav_float(final_wav, audio, sr)
 
-        # A. Pitch Adjustment Resample Loop
-        factor_pitch = 2 ** (int(fx["pitch_semitones"]) / 12)
-        audio = resample(audio, max(int(len(audio) / factor_pitch), MIN_SAMPLES))
-        # B. Throat Formant Resonance Resample Loop
-        factor_formant = int(fx["formant_percent"]) / 100
-        audio = resample(audio, max(int(len(audio) / factor_formant), MIN_SAMPLES))
-        # C. Hardware Ring Modulation (Wet/Dry Blend)
-        wet = int(fx["ring_mix"]) / 100.0
-        t = np.arange(len(audio)) / sr
-        audio = (audio * (1 - wet)) + (audio * np.sin(2 * np.pi * int(fx["ring_freq"]) * t) * wet)
-        wavfile.write(str(final_wav), sr, (np.clip(audio, -1.0, 1.0) * 32767).astype(np.int16))
-
-        self._test_thread.emit_log(" Applying volume and tempo layers via FFmpeg...")
-        setrate_val = int(44100 * float(fx["rate"]))
-        filter_string = (
-            f"volume={int(fx['gain_db'])}dB,atempo={float(fx['tempo'])},asetrate={setrate_val}"
-        )
-        ffmpeg_bin = str(heavy_cfg.ffmpeg_path)
         ffplay_bin = str(heavy_cfg.ffmpeg_path.parent / "ffplay.exe")
-
-        subprocess.run([
-            ffmpeg_bin, "-hide_banner", "-y",
-            "-i", str(final_wav), "-af", filter_string, "-ar", "22050", str(temp_wav),
-        ], check=True, creationflags=_CREATE_NO_WINDOW)
-
-        self._test_thread.emit_log(" Pinning loudness to game-mix levels (two-pass loudnorm)...")
-        from engine.tts_utils import apply_loudness_normalization
-        target = float(heavy_cfg.voice_effects.get("loudness_target", -5.0))
-        true_peak = float(heavy_cfg.voice_effects.get("loudness_true_peak", 5.0))
-        apply_loudness_normalization(ffmpeg_bin, temp_wav, target, _CREATE_NO_WINDOW, true_peak=true_peak)
-
         self._test_thread.emit_log(" Footprints generated successfully! Triggering playback stream...")
         # Play at reduced volume: the sandbox auditions the exact game-bound audio,
         # but the game's own voice bus adds attenuation a raw desktop playback lacks.
         subprocess.run([
-            ffplay_bin, "-nodisp", "-autoexit", "-volume", "35", str(temp_wav)
+            ffplay_bin, "-nodisp", "-autoexit", "-volume", "35", str(final_wav)
         ], check=True, creationflags=_CREATE_NO_WINDOW)
         self._test_thread.emit_log(" Playback loop finished smoothly. Tuning complete.")
 

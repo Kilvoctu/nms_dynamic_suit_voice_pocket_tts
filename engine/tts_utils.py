@@ -1,5 +1,4 @@
 # engine/tts_utils.py
-import json
 import os
 import shutil
 import subprocess
@@ -254,32 +253,19 @@ def trim_pocket_silence(audio, sr, lead_ms: float = 80.0, tail_ms: float = 200.0
 
 def run_tts(config, text: str, wem_num: str, postprocess: bool = True) -> Path:
     final_wav = config.temp_wav_dir / f"{wem_num}.wav"
-    temp_wav = final_wav.with_suffix(".temp.wav")
 
     audio, sample_rate = pocket_generate(
         config.pocket_model_name, config.root_dir, text, config.tts_voice,
         max_tokens=getattr(config, "pocket_tts_max_tokens", 100)
     )
-    _write_wav(final_wav, audio, sample_rate)
 
     if postprocess:
-        # Pull your customized voice options directly out of the verified config layer!
-        fx = config.voice_effects  # Native user configuration dictionary
+        from engine.audio_chain import render_chain, write_wav_float
 
-        apply_vocal_dsp_chain(
-            input_wav=final_wav,
-            output_wav=temp_wav,
-            gain_db=fx.get("gain_db", 5),
-            pitch_semitones=fx.get("pitch_semitones", 4),
-            tempo=fx.get("tempo", 1.02),
-            rate=fx.get("rate", 0.51),
-            ring_freq=fx.get("ring_freq", 300),
-            ring_mix=fx.get("ring_mix", 100),
-            formant_percent=fx.get("formant_percent", 80),
-            loudness_target=fx.get("loudness_target", -5.0),
-            loudness_true_peak=fx.get("loudness_true_peak", 5.0)
-        )
-        temp_wav.replace(final_wav)
+        audio, sample_rate = render_chain(audio, sample_rate, config.voice_effects)
+        write_wav_float(final_wav, audio, sample_rate)
+    else:
+        _write_wav(final_wav, audio, sample_rate)
 
     return final_wav
 
@@ -296,160 +282,3 @@ def _write_wav(path: Path, audio, sample_rate: int):
         wf.setframerate(int(sample_rate))
         wf.writeframes(samples.tobytes())
 
-
-def _resolve_ffmpeg() -> str:
-    """Locate an ffmpeg binary without relying on pre-seeded PATH state."""
-    found = shutil.which("ffmpeg")
-    if found:
-        return found
-    local = Path(__file__).parent.parent / "state" / "bin" / "ffmpeg.exe"
-    if local.is_file():
-        return str(local)
-    return "ffmpeg"  # fall through: subprocess will raise a clear error
-
-
-def _measure_loudness(ffmpeg_bin: str, wav_path: Path, create_no_window: int, pre_filter: str = ""):
-    """First loudnorm pass: return the measured JSON stats, or None on failure.
-    pre_filter filters are applied before analysis (measures the post-chain audio)."""
-    import re
-    analysis_chain = f"{pre_filter},loudnorm=print_format=json" if pre_filter else "loudnorm=print_format=json"
-    result = subprocess.run(
-        [ffmpeg_bin, "-hide_banner", "-i", str(wav_path),
-         "-af", analysis_chain, "-f", "null", "-"],
-        capture_output=True, text=True, creationflags=create_no_window,
-    )
-    match = re.search(r'\{[^{}]*"input_i"[^{}]*\}', result.stderr or "")
-    if not match:
-        return None
-    try:
-        stats = json.loads(match.group(0))
-    except Exception:
-        return None
-    if not stats.get("input_i") or stats["input_i"] in ("-inf",):
-        return None
-    return stats
-
-
-def apply_loudness_normalization(ffmpeg_bin: str, wav_path: Path, loudness_target: float,
-                                 create_no_window: int = 0, true_peak: float = 5.0,
-                                 initial_stats=None, pre_chain: str = "") -> bool:
-    """Gain toward the loudness target with a true-peak limiter cap; iterates until it holds.
-    initial_stats/pre_chain ride the first apply pass, saving a separate analysis spawn."""
-    create_no_window = create_no_window or (0x08000000 if sys.platform == "win32" else 0)
-    stats = initial_stats
-    if stats is not None:
-        try:
-            float(stats["input_i"])
-        except (KeyError, TypeError, ValueError):
-            stats = None
-    tmp_path = wav_path.with_suffix(".loudnorm.wav")
-    try:
-        for _ in range(5):
-            if stats is None:
-                stats = _measure_loudness(ffmpeg_bin, wav_path, create_no_window)
-                if not stats:
-                    return False
-            try:
-                measured_i = float(stats["input_i"])
-            except (KeyError, TypeError, ValueError):
-                return False
-            # Iterate: gain toward the target (+0.9 compensation pre-empts wav2wem's LUFS loss), then a
-            # lookahead limiter caps true peaks; limiting steals loudness, so re-measure (max 5 passes).
-            gain_db = loudness_target - measured_i + WEM_ENCODER_COMPENSATION_DB
-            if abs(gain_db) <= 0.4 and not pre_chain:
-                return True
-            gain_db = max(min(gain_db, 12.0), -12.0)
-            # Keep 2 dB of sample-peak headroom below the ceiling: hard-clipped
-            # speech carries ~1-3 dB of intersample overshoot past sample peaks.
-            sample_ceiling = max(true_peak - 2.0, 0.0)
-            limiter_chain = (
-                f"volume={gain_db:.2f}dB,"
-                f"volume={10 ** (-sample_ceiling / 20):.6f},"
-                f"alimiter=limit=1:attack=5:release=50,"
-                f"volume={10 ** (sample_ceiling / 20):.6f}"
-            )
-            chain = f"{pre_chain},{limiter_chain}" if pre_chain else limiter_chain
-            pre_chain = ""  # creative filters only ride the first apply pass
-            result = subprocess.run(
-                [ffmpeg_bin, "-hide_banner", "-y",
-                 "-i", str(wav_path),
-                 "-af", chain,
-                 "-ar", "22050",
-                 "-c:a", "pcm_f32le",  # float output: allows true peak above 0 dBFS
-                 str(tmp_path)],
-                capture_output=True, text=True, creationflags=create_no_window,
-            )
-            if result.returncode != 0 or not tmp_path.is_file():
-                if tmp_path.exists():
-                    tmp_path.unlink()
-                return False
-            tmp_path.replace(wav_path)
-            stats = None  # the audio changed: re-measure next iteration
-        return True
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink()
-
-
-def apply_vocal_dsp_chain(input_wav: Path, output_wav: Path,
-                          gain_db, pitch_semitones, tempo, rate,
-                          ring_freq, ring_mix, formant_percent,
-                          loudness_target=-5.0, loudness_true_peak=5.0,
-                          target_sr=22050):
-
-    # 1. LOAD RAW BYTES NATIVELY INTO NUMPY ARRAY
-    with wave.open(str(input_wav), "rb") as wf:
-        sr = wf.getframerate()
-        audio = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32)
-        if wf.getnchannels() > 1:
-            audio = audio[::wf.getnchannels()]  # Enforce structural mono
-
-    if len(audio) < MIN_SAMPLES:
-        audio = np.pad(audio, (0, MIN_SAMPLES - len(audio)))
-
-    # 2. RUN MATRIX RESAMPLING IN THE CORRECT PASSED SANDBOX SEQUENCE
-    # Imported lazily: scipy.signal costs ~1s at import time and must not slow app startup.
-    from scipy.signal import resample
-
-    # A. Pitch Frequency Shift
-    factor_pitch = 2 ** (pitch_semitones / 12)
-    n_samples_pitch = max(int(len(audio) / factor_pitch), MIN_SAMPLES)
-    audio = resample(audio, n_samples_pitch)
-
-    # B. Throat Resonator Formant Shift
-    factor_formant = formant_percent / 100
-    n_samples_formant = max(int(len(audio) / factor_formant), MIN_SAMPLES)
-    audio = resample(audio, n_samples_formant)
-
-    # C. Cybernetic Overlay Blending (Dry/Wet Matrix)
-    wet_factor = ring_mix / 100.0
-    dry_factor = 1.0 - wet_factor
-
-    dry_signal = audio.copy()
-    t = np.arange(len(audio)) / sr
-    wet_signal = audio * np.sin(2 * np.pi * ring_freq * t)
-
-    audio = (dry_signal * dry_factor) + (wet_signal * wet_factor)
-
-    # Write processed array steps back to a temporary disk target
-    if np.max(np.abs(audio)) > 0:
-        audio = audio / np.max(np.abs(audio)) * 32767
-    audio_bytes = audio.astype(np.int16).tobytes()
-
-    with wave.open(str(output_wav), "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sr)
-        wf.writeframes(audio_bytes)
-
-    # 3. One ffmpeg pass: the creative chain (volume/tempo/rate) rides into the first loudnorm
-    #    apply; loudness is measured with the chain pre-applied so the linear gain math stays exact.
-    CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
-    setrate_val = int(44100 * rate)
-    ffmpeg_bin = _resolve_ffmpeg()
-    pre_chain = f"volume={gain_db}dB,atempo={tempo},asetrate={setrate_val}"
-    stats = _measure_loudness(ffmpeg_bin, output_wav, CREATE_NO_WINDOW, pre_filter=pre_chain)
-    apply_loudness_normalization(
-        ffmpeg_bin, output_wav, loudness_target, CREATE_NO_WINDOW,
-        true_peak=loudness_true_peak, initial_stats=stats, pre_chain=pre_chain
-    )

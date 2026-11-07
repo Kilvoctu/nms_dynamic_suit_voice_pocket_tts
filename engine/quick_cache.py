@@ -11,15 +11,15 @@ import traceback
 from queue import PriorityQueue
 from pathlib import Path
 from engine.cache_replenishment import rephrase_replacement_line, render_replacement_line
+from engine.audio_chain import CHAIN_VERSION
 
-# Priority queues: stage 1 rephrases with the LLM, stage 2 renders TTS+WEM, on separate workers.
-# Tiers: 0 = lines the player waits on, 10 = the voice-file sweep, 20 = restock core, 30 = filler.
-_rephrase_queue = PriorityQueue()
-_render_queue = PriorityQueue()
+# Two lanes: rush (priority 0, lines the player waits on) and fill (10 = the
+# voice-file sweep, 20 = restock core, 30 = filler).
+_rush_queue = PriorityQueue()
+_fill_queue = PriorityQueue()
 _job_seq = itertools.count()
-_render_seq = itertools.count()
-_llm_worker_thread: threading.Thread | None = None
-_tts_worker_thread: threading.Thread | None = None
+_fill_worker_thread: threading.Thread | None = None
+_rush_worker_thread: threading.Thread | None = None
 _MANIFEST_FILENAME = "mod_folder_manifest.json"
 _FALLBACK_WAIT_TIMEOUT_S = 120  # max wait for an on-demand generation before skipping
 _RESTOCK_CORE = 2  # variants per line topped up at serve time; deeper filler runs in rounds
@@ -54,6 +54,7 @@ def _settings_fingerprint(config) -> str:
         str(getattr(config, "player_name", "")),
         str(getattr(config, "suit_voice_base", "")),
         Path(str(getattr(config, "llm_model", ""))).stem,  # rephrasing-model era
+        str(CHAIN_VERSION),  # render-chain era: a chain sound change re-records the cache
     ])
     return hashlib.sha1(era.encode("utf-8")).hexdigest()[:12]
 
@@ -118,8 +119,6 @@ def _publish_queue_depth(config=None):
             pass
 
 def enqueue_job(func, *args, priority=10, **kwargs):
-    """Add a job to the rephrase stage and track its allocation. Tiers: 0 = gameplay
-    lines the player waits on, 10 = the voice-file sweep, 20 = restock core, 30 = filler."""
     start_worker()  # ensure worker is running
 
     # If it's a replacement job, increment the tracking counter for this WEM ID
@@ -133,7 +132,8 @@ def enqueue_job(func, *args, priority=10, **kwargs):
                 _gameplay_pending[wem_id] = _gameplay_pending.get(wem_id, 0) + 1
         _publish_queue_depth(args[0] if args else None)
 
-    _rephrase_queue.put((priority, next(_job_seq), (func, args, kwargs)))
+    queue = _rush_queue if priority == 0 else _fill_queue
+    queue.put((priority, next(_job_seq), (func, args, kwargs)))
 
 def _decrement_job(wem_id: str, priority: int):
     """Job lifecycle end (render done or rephrase failed): free the wem's slot.
@@ -153,47 +153,38 @@ def _decrement_job(wem_id: str, priority: int):
     _publish_queue_depth()
 
 
-def _llm_worker_loop():
-    """Stage 1: rephrase with the LLM, then hand the text to the render stage."""
+def _worker_loop(queue):
+    """Lane worker: run each job end-to-end (rephrase, render, encode) and owe
+    the job-slot decrement when done. One lane active = one stage on the CPU."""
     while True:
-        _priority, _seq, (func, args, kwargs) = _rephrase_queue.get()
+        _priority, _seq, (func, args, kwargs) = queue.get()
         try:
             func(*args, **kwargs)
         except Exception:
-            print(f"[Worker] Rephrase failed: {func.__name__} {args!r}")
+            print(f"[Worker] Job failed: {func.__name__} {args!r}")
             traceback.print_exc()
+        finally:
             if func == _replacement_wrapper:
-                _decrement_job(args[1], kwargs.get("priority", 10))
-        finally:
-            _rephrase_queue.task_done()
-
-def _render_worker_loop():
-    """Stage 2: TTS render + encode. Owes the job-slot decrement when done."""
-    while True:
-        _priority, _seq, (config, wem_id, wem_dir, reworded) = _render_queue.get()
-        try:
-            render_replacement_line(config, wem_id, wem_dir, reworded)
-        except Exception:
-            print(f"[Worker] Render failed: {wem_id}")
-            traceback.print_exc()
-        finally:
-            _decrement_job(wem_id, _priority)
-            _render_queue.task_done()
+                _decrement_job(args[1], _priority)
+            queue.task_done()
 
 def start_worker():
-    global _llm_worker_thread, _tts_worker_thread
-    if _llm_worker_thread is None or not _llm_worker_thread.is_alive():
-        _llm_worker_thread = threading.Thread(target=_llm_worker_loop, daemon=True, name="llm-stage")
-        _llm_worker_thread.start()
-    if _tts_worker_thread is None or not _tts_worker_thread.is_alive():
-        _tts_worker_thread = threading.Thread(target=_render_worker_loop, daemon=True, name="tts-stage")
-        _tts_worker_thread.start()
+    global _fill_worker_thread, _rush_worker_thread
+    if _fill_worker_thread is None or not _fill_worker_thread.is_alive():
+        _fill_worker_thread = threading.Thread(
+            target=_worker_loop, args=(_fill_queue,), daemon=True, name="fill-lane")
+        _fill_worker_thread.start()
+    if _rush_worker_thread is None or not _rush_worker_thread.is_alive():
+        _rush_worker_thread = threading.Thread(
+            target=_worker_loop, args=(_rush_queue,), daemon=True, name="rush-lane")
+        _rush_worker_thread.start()
 
 def _replacement_wrapper(config, wem_id: str, wem_dir: Path, rephrase: bool = True, priority: int = 10):
-    """Stage-1 job body: reword via LLM, then hand off to the TTS render stage."""
+    """Job body: reword via the LLM, then render + encode - sequentially, so a
+    fill job never runs its LLM and TTS stages against each other."""
     reworded = rephrase_replacement_line(config, wem_id, rephrase=rephrase)
     if reworded is not None:
-        _render_queue.put((priority, next(_render_seq), (config, wem_id, wem_dir, reworded)))
+        render_replacement_line(config, wem_id, wem_dir, reworded)
 
 
 # --- Restart Manager plumbing: name the process(es) holding a file open at swap give-up ---

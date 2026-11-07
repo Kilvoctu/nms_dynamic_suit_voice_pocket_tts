@@ -84,7 +84,7 @@ CUSTOMIZATION_DEFAULTS = {
         "ring_mix": 100,
         "pitch_semitones": 4,
         "formant_percent": 80,
-        "loudness_target": -5.0,
+        "loudness_target": -16.0,
         "loudness_true_peak": 5.0,
     },
 }
@@ -259,7 +259,7 @@ class SuitVoiceConfig:
             if self.llm_variant != DEFAULT_LLM_VARIANT:
                 print(f"Selected LLM variant '{self.llm_variant}' is not downloaded - using the default model. Run Setup to fetch it.")
             self.llm_model = str(self.resolve_json_path(models.get("llm_model"), root_dir, must_exist=True))
-        self.llm = None  # You can also use self.llm: Optional[Llama] = None if it squawks here too
+        self.llm = None
         if init_llm:
             self.load_llm()
 

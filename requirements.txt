@@ -5,6 +5,8 @@
 pocket-tts>=4.0.1
 numpy
 scipy
+pyloudnorm==0.2.0
+praat-parselmouth==0.4.7
 llama-cpp-python==0.3.36
 Pillow>=11.3.0,<12
 pystray>=0.19.5,<0.20

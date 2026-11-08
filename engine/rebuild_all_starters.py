@@ -1,8 +1,6 @@
 # rebuild_all_starters.py
-"""Rebuild every starter wem in the shipping voice: eponine + Factory Standard.
-
-Renders the stock vanilla transcriptions (no LLM) through the production chain
-and re-encodes them over assets/starter_wems. Run with the engine stopped."""
+"""Rebuild every starter wem in the shipping voice (eponine + Factory Standard), no LLM.
+Renders stock transcriptions through the production chain over assets/starter_wems; run with the engine stopped."""
 import argparse
 import csv
 import json

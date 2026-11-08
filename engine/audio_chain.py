@@ -1,9 +1,6 @@
 # engine/audio_chain.py
 """In-memory numpy render chain: float32 array-in/array-out, no disk I/O, no subprocesses.
-Order: upsample to the 40 kHz FX canvas -> speed/pitch (Praat) -> parametric EQ -> FX pre-stage ->
-BS.1770 loudness -> FX post-stage (limiter) -> 48000 Hz stereo container (genuine vanilla wem format;
-wem_utils patches the encoded fmt's mask/GUID so the game's decoder plays it).
-EQ + FX rack units live in engine.fx."""
+Order: 40 kHz FX canvas -> speed/pitch (Praat) -> EQ -> FX pre -> loudness -> FX post -> 48k stereo wem (wem_utils fmt-patches it)."""
 import numpy as np
 
 from engine import fx
@@ -111,10 +108,8 @@ def _normalize_loudness(y, sr, target: float, true_peak: float):
 
 
 def render_chain(audio, sr, preset, loudness_target=None, true_peak=5.0):
-    """Full render chain: upsample to the 40 kHz FX canvas -> speed/pitch (Praat) -> parametric EQ ->
-    FX pre-stage -> BS.1770 loudness -> FX post-stage (limiter) -> 48000 Hz stereo container.
-    preset: {"speed", "pitch_st", "volume", "eq_bands", "fx"} - fx.sanitize_* makes it safe.
-    "volume" is a per-preset dB trim on top of `loudness_target` (0 = no trim)."""
+    """Full render chain: canvas -> speed/pitch (Praat) -> EQ -> FX pre -> loudness -> FX post -> 48k stereo.
+    preset: {"speed", "pitch_st", "volume", "eq_bands", "fx"}; "volume" = per-preset dB trim on `loudness_target`."""
     if loudness_target is None:
         from engine.config import CUSTOMIZATION_DEFAULTS
 

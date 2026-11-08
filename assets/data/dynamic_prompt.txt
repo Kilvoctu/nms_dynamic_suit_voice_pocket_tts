@@ -1,14 +1,11 @@
-Details for context:
-- Category: {category_type}
-- Intent: {input_intent}
-- Current Input: {input_phrase}
-
 {wordiness_prompt}
 {tone_prompt}
 YOU ARE SPEAKING DIRECTLY TO {name} - DO NOT EVER INSULT THEM BY REFERRING TO THEM IN THIRD PERSON.
 MANDATORY INSTRUCTION: {category_context}
 
+Current notification ({category_type} - {input_intent}):
+{input_phrase}
+
 Each sentence in your output must be unique and never include phrasing that matches or re-uses any phrases or
 distinct elements out of the following list:
 {recent_lines}
-

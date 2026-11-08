@@ -185,6 +185,27 @@ def start_worker():
             target=_worker_loop, args=(_rush_queue,), daemon=True, name="rush-lane")
         _rush_worker_thread.start()
 
+# Per-line play counts, persisted: filler depth concentrates on lines the game actually fires.
+_play_counts_path = Path(__file__).resolve().parents[1] / "state" / "cache" / "play_counts.json"
+_play_counts: dict = {}
+try:
+    _play_counts = json.loads(_play_counts_path.read_text(encoding="utf-8"))
+except Exception:
+    _play_counts = {}
+
+
+def note_play(wem_id):
+    """Count a detected gameplay play; persisted so the depth bias survives restarts."""
+    try:
+        _play_counts[str(wem_id)] = _play_counts.get(str(wem_id), 0) + 1
+        with _publish_lock:
+            tmp = _play_counts_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(_play_counts), encoding="utf-8")
+            tmp.replace(_play_counts_path)
+    except Exception:
+        pass
+
+
 def _replacement_wrapper(config, wem_id: str, wem_dir: Path, rephrase: bool = True, priority: int = 10):
     """Job body: reword via the LLM, then render + encode - sequentially, and under
     the gen lock so the two lanes never run LLM or TTS stages against each other."""
@@ -493,12 +514,17 @@ def _maybe_start_filler_round(just_served=None):
         if wem_id == just_served and have:
             have -= 1  # the served variant leaves the cache as soon as we return
         under = have + pending < max_depth
+        if under and _play_counts.get(str(wem_id), 0) == 0 and have + pending >= _RESTOCK_CORE:
+            under = False  # cold line: hold at core depth until the game plays it
         if under:
             to_queue.append((wem_id, wem_dir))
         depth_sum += have + pending + (1 if under else 0)
         depth_count += 1
     if not to_queue:
         return
+    # Hot lines first: played lines reach depth sooner, so fresh variants exist
+    # before their next play instead of after it.
+    to_queue.sort(key=lambda t: -_play_counts.get(str(t[0]), 0))
     # Reserve the round atomically so a chained call can't double-start, and so
     # the counter is already valid if a job somehow completes instantly.
     with _jobs_lock:
@@ -562,6 +588,8 @@ def get_cached_wem(config, wem_id, top_up=True, rephrase=True, priority=0):
 
     # Clean target lookup ID
     id_str = str(wem_id).strip()
+    if priority == 0:
+        note_play(id_str)  # gameplay serve: feeds the play-frequency depth bias
     prefix = f"{id_str}_{_voice_tag(getattr(config, 'tts_voice', '') or 'unknown')}_{_settings_fingerprint(config)}_"
 
     # Purge variants generated under a different voice/settings era

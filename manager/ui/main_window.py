@@ -184,7 +184,8 @@ class MainWindow(QMainWindow):
             updated.setdefault("runtime", {})
             updated["runtime"]["quick_cache_max"] = int(system_tab.cache_max_spin.value())
             updated["runtime"]["serve_workers"] = int(system_tab.serve_spin.value())
-            updated["runtime"]["gen_threads"] = int(system_tab.threads_spin.value())
+            updated["runtime"]["decode_threads"] = int(system_tab.decode_spin.value())
+            updated["runtime"]["eval_threads"] = int(system_tab.eval_spin.value())
             if hasattr(system_tab, "model_combo"):
                 updated.setdefault("models", {})["llm_variant"] = system_tab.model_combo.currentData() or "e2b"
         updated.setdefault("tts_voice", "fantine")

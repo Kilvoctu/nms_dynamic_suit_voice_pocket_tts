@@ -15,7 +15,7 @@ def watch_wems(wtray_ui, config):
     wtray_ui.icon.title = "Dynamic Suit Voice - Loading TTS Voice Models..."
 
     from engine.tts_utils import warm_pocket_engine, set_torch_threads
-    set_torch_threads(config.gen_threads)  # before model load: torch picks the cap up at import
+    set_torch_threads(config.decode_threads)  # before model load: torch picks the cap up at import
     config.tts_model = warm_pocket_engine(config.pocket_model_name, config.root_dir, config.tts_voice)
 
     # --- PHASE 2: Initialize Llama-cpp Core Engine weights ---
@@ -327,8 +327,8 @@ def watch_wems(wtray_ui, config):
             else:
                 if changed:
                     print(f"[Config] Applied live changes: {', '.join(changed)}")
-                    if "generation threads" in changed:
-                        set_torch_threads(config.gen_threads)  # torch cap applies live; LLM needs a restart
+                    if "decoding threads" in changed:
+                        set_torch_threads(config.decode_threads)  # torch cap applies live; LLM needs a restart
                     threading.Thread(target=_refresh_mod_folder, daemon=True, name="mod-folder-refresh").start()
         if config.mod_dir != current_mod_dir:
             current_mod_dir = config.mod_dir

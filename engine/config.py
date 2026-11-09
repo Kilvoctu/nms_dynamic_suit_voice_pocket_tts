@@ -16,6 +16,19 @@ from engine.path_utils import (
     resolve_mod_wem_dir,
 )
 
+
+def resolve_thread_settings(runtime: dict):
+    """(decode_threads, eval_threads) from a merged runtime dict; eval 0/auto; legacy gen_threads honored.
+    Auto eval = min(8, cpu_count): one thread per physical core is the game-friendly profile
+    (ragged counts like 12 on 8C/16T stall tiny KV-tail evals ~3x)."""
+    cpu = os.cpu_count() or 4
+    _decode = runtime.get("decode_threads", runtime.get("gen_threads"))
+    decode = max(1, int(_decode if _decode is not None else min(cpu, 8)))
+    _eval = int(runtime.get("eval_threads", 0) or 0)
+    eval_threads = _eval if _eval > 0 else max(1, min(8, cpu))
+    return decode, eval_threads
+
+
 ENVIRONMENT_DEFAULTS = {
     "paths": {
         "mod_dir": "C:/Program Files (x86)/Steam/steamapps/common/No Man's Sky/GAMEDATA/MODS",
@@ -29,7 +42,6 @@ ENVIRONMENT_DEFAULTS = {
         "max_session_lines": 10,
         "quick_cache_max": 8,
         "serve_workers": 3,
-        "gen_threads": 8,
     },
     "models": {
         "llm_variant": "e2b",
@@ -135,7 +147,7 @@ class SuitVoiceConfig:
         self.max_session_lines = int(runtime.get("max_session_lines", 10))
         self.quick_cache_max = int(runtime.get("quick_cache_max", 16))
         self.serve_workers = max(1, int(runtime.get("serve_workers", 3)))
-        self.gen_threads = max(1, int(runtime.get("gen_threads", min(os.cpu_count() or 4, 8))))
+        self.decode_threads, self.eval_threads = resolve_thread_settings(runtime)
 
         # ====================================================
         # CORE FILESYSTEM PATHS (user config first; env config holds shipped defaults)
@@ -279,7 +291,8 @@ class SuitVoiceConfig:
             model_path=self.llm_model,
             n_ctx=40960,
             n_batch=1024,
-            n_threads=self.gen_threads,  # per-stage CPU cap; torch cap set in tts_utils
+            n_threads=self.decode_threads,  # decode cap; also torch cap via pipeline; eval cap set below
+            n_threads_batch=self.eval_threads,  # rephrase prompt-eval fans wide
             verbose=False,
             flash_attn=True,  # supported by Gemma's architecture; removes V-cache padding
         )
@@ -335,9 +348,10 @@ class SuitVoiceConfig:
         new_workers = max(1, int(runtime.get("serve_workers", 3)))
         _track("serve workers", self.serve_workers, new_workers)
         self.serve_workers = new_workers
-        new_threads = max(1, int(runtime.get("gen_threads", min(os.cpu_count() or 4, 8))))
-        _track("generation threads", self.gen_threads, new_threads)
-        self.gen_threads = new_threads
+        new_decode, new_eval = resolve_thread_settings(runtime)
+        _track("decoding threads", self.decode_threads, new_decode)
+        _track("evaluation threads", self.eval_threads, new_eval)
+        self.decode_threads, self.eval_threads = new_decode, new_eval
         new_cache_max = int(runtime.get("quick_cache_max", 16))
         _track("cache size", self.quick_cache_max, new_cache_max)
         self.quick_cache_max = new_cache_max

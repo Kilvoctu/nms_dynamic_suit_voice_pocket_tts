@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from manager.setup_runner import SetupRunner, is_setup_complete
 from engine import tts_utils
+from engine.config import resolve_thread_settings
 from engine.path_utils import (
     LLM_VARIANTS,
     active_llm_variant,
@@ -352,22 +353,43 @@ class SystemTab(QWidget):
         serve_row.addWidget(self.serve_spin)
         vault_layout.addLayout(serve_row)
 
-        cpu_count = os.cpu_count() or 4
-        self.threads_spin = QSpinBox()
-        self.threads_spin.setRange(1, cpu_count)
-        self.threads_spin.setValue(max(1, int(runtime.get("gen_threads", min(cpu_count, 8)))))
-        self.threads_spin.setToolTip(
-            "CPU threads per generation stage (LLM rephrase + TTS render).\n"
-            "Lower leaves headroom while gaming; LLM value applies on engine restart."
+        cpu_count = os.cpu_count() or 4  # slider upper bounds
+        decode_val, eval_val = resolve_thread_settings(runtime)
+
+        self.eval_spin = QSpinBox()
+        self.eval_spin.setRange(1, max(cpu_count, 16))
+        self.eval_spin.setValue(eval_val)
+        self.eval_spin.setToolTip(
+            "Threads used while the AI reads the prompt and prepares each rephrasing (short bursts).\n"
+            "Default is about half your core count - smooth for gaming; raise to your full core\n"
+            "count for maximum pre-generation speed. In-between values (e.g. 12 on a 16-thread CPU)\n"
+            "are dramatically slower. Only applies on engine restart (bound when the model loads)."
         )
-        threads_row = QHBoxLayout()
-        threads_label = QLabel("Generation CPU threads:")
-        threads_label.setWordWrap(True)
-        threads_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        threads_row.addWidget(threads_label, 1)
-        self.threads_spin.setFixedWidth(110)
-        threads_row.addWidget(self.threads_spin)
-        vault_layout.addLayout(threads_row)
+        eval_row = QHBoxLayout()
+        eval_label = QLabel("Evaluation Threads:")
+        eval_label.setWordWrap(True)
+        eval_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        eval_row.addWidget(eval_label, 1)
+        self.eval_spin.setFixedWidth(110)
+        eval_row.addWidget(self.eval_spin)
+        vault_layout.addLayout(eval_row)
+
+        self.decode_spin = QSpinBox()
+        self.decode_spin.setRange(1, cpu_count)
+        self.decode_spin.setValue(decode_val)
+        self.decode_spin.setToolTip(
+            "Threads while the AI writes each new phrasing and the voice renders it.\n"
+            "Up to ~8 helps; beyond that it gets slower again.\n"
+            "Applies live for rendering; on engine restart for the LLM."
+        )
+        decode_row = QHBoxLayout()
+        decode_label = QLabel("Decoding Threads:")
+        decode_label.setWordWrap(True)
+        decode_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        decode_row.addWidget(decode_label, 1)
+        self.decode_spin.setFixedWidth(110)
+        decode_row.addWidget(self.decode_spin)
+        vault_layout.addLayout(decode_row)
 
         # Rephrasing model choice: E2B vs E4B GGUF, committed on Apply Changes.
         variant = active_llm_variant(self.window.env_data, self.window.user_data)

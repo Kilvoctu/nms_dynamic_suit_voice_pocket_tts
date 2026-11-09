@@ -75,6 +75,7 @@ jobs:
           $asset = "NMS_DSV-$env:TAG-win64.zip"
           $extra = @()
           if ($env:PRERELEASE -eq "true") { $extra += "--prerelease" }
-          if ([string]::IsNullOrWhiteSpace($env:NOTES)) { $env:NOTES = "Windows build. Unzip somewhere safe and run DSV.exe; state\ is created beside it on first run." }
+          $blurb = "Unzip somewhere safe and run DSV.exe. A ``state\`` folder containing user stuff is created beside it on first run."
+          if ([string]::IsNullOrWhiteSpace($env:NOTES)) { $env:NOTES = $blurb } else { $env:NOTES = "$($env:NOTES)`n`n$blurb" }
           $hash = (Get-FileHash "dist\$asset" -Algorithm SHA256).Hash.ToLower()
-          gh release create "$env:TAG" "dist\$asset" "dist\$asset.sha256" --title "NMS Dynamic Suit Voice $env:TAG" --notes "$($env:NOTES)`n`nSHA256: ``$hash``" @extra
+          gh release create "$env:TAG" "dist\$asset" "dist\$asset.sha256" --title "NMS Dynamic Suit Voice $env:TAG" --generate-notes --notes "$($env:NOTES)`n`nSHA256: ``$hash``" @extra

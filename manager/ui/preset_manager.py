@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from engine import prompt_presets
+from engine.path_utils import assets_root
 from ui.style import DIM, ERROR, GOOD, HINT_QSS, WARN, status_qss
 from ui.workers import FunctionThread
 
@@ -143,7 +144,7 @@ class PresetSectionEditor(QWidget):
     def _load_builtin(self) -> dict:
         """Read this section's built-in entries from the tracked prompt_data.json."""
         try:
-            path = self.project_root / "assets" / "data" / "prompt_data.json"
+            path = assets_root() / "assets" / "data" / "prompt_data.json"
             raw = json.loads(path.read_text(encoding="utf-8"))
             entries = raw.get(self.section, {})
             return {k: v for k, v in entries.items() if isinstance(v, dict)}
@@ -453,7 +454,7 @@ class CombinationTestTab(QWidget):
     def _load_entries(self) -> list:
         """Usable transcript entries as dicts: wem_id, transcription, category, intent."""
         try:
-            path = self.project_root / "assets" / "data" / "nms_suit_voice_transcripts.json"
+            path = assets_root() / "assets" / "data" / "nms_suit_voice_transcripts.json"
             raw = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             return []
@@ -508,7 +509,7 @@ class CombinationTestTab(QWidget):
     def _builtin_section(self, section) -> dict:
         """Built-in names for a section (mirrors the section editors' source)."""
         try:
-            path = self.project_root / "assets" / "data" / "prompt_data.json"
+            path = assets_root() / "assets" / "data" / "prompt_data.json"
             raw = json.loads(path.read_text(encoding="utf-8"))
             return raw.get(section, {})
         except Exception:
@@ -519,7 +520,7 @@ class CombinationTestTab(QWidget):
         config = self._config_shim()
         try:
             raw = json.loads(
-                (self.project_root / "assets" / "data" / "prompt_data.json").read_text(encoding="utf-8")
+                (assets_root() / "assets" / "data" / "prompt_data.json").read_text(encoding="utf-8")
             )
         except Exception:
             raw = {}
@@ -533,7 +534,7 @@ class CombinationTestTab(QWidget):
     def _builtin_base_text(self) -> str:
         """The pristine built-in base prompt text from data/base_prompt.txt."""
         try:
-            return (self.project_root / "assets" / "data" / "base_prompt.txt").read_text(encoding="utf-8")
+            return (assets_root() / "assets" / "data" / "base_prompt.txt").read_text(encoding="utf-8")
         except Exception:
             return ""
 
@@ -734,7 +735,7 @@ class BasePromptEditor(PresetSectionEditor):
     def _read_builtin_text(self, project_root) -> str:
         """The pristine built-in base prompt from data/base_prompt.txt."""
         try:
-            return (Path(project_root) / "assets" / "data" / "base_prompt.txt").read_text(encoding="utf-8")
+            return (assets_root() / "assets" / "data" / "base_prompt.txt").read_text(encoding="utf-8")
         except Exception:
             return ""
 

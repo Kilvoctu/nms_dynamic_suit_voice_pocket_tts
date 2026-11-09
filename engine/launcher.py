@@ -50,6 +50,7 @@ class _LineStamper:
         while "\n" in self._buf:
             line, self._buf = self._buf.split("\n", 1)
             self._stream.write(time.strftime("[%H:%M:%S] ") + line + "\n")
+            self._stream.flush()  # frozen stdout is block-buffered; live lines beat batched ones
 
     def flush(self):
         if self._buf:

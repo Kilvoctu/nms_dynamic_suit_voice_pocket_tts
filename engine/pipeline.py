@@ -5,6 +5,7 @@ from pathlib import Path
 from engine.quick_cache import (begin_sweep_wave, end_sweep_wave, get_cached_wem,
                                 move_cachedfile_to_mod_dir, refill_core_cache, _settings_fingerprint)
 from engine.oplock_watch import OplockWatch
+from engine.wem_utils import wem_duration_seconds
 from PIL import Image
 # NOTE: No global config or TTS instantiations live at the top of this file anymore!
 
@@ -63,6 +64,9 @@ def watch_wems(wtray_ui, config):
     _in_flight = set()
     _burst_drops = {}  # plays coalesced mid-serve, requeued when the serve lands (no silent loss)
     _last_play_seen = {}  # gap bookkeeping so fired lines tell how far apart the plays were
+    _fire_times = {}  # last real fire per line: anchors the play-length swap gate
+    _fire_clip = {}  # parsed clip length at fire time (None = unknown; gate falls back)
+    _SWAP_MARGIN_S = 1.25  # fire -> decode start latency plus FMOD buffer slop
     _retry_src = {}  # picked variant stashed across a give-up chase so the refire swaps it directly
     _fire_queue = _queue.Queue()
 
@@ -109,6 +113,16 @@ def watch_wems(wtray_ui, config):
         head = src.stem.rsplit("_", 2)[0]  # date and time are the last two underscore segments
         return head.rsplit("_", 1)[-1]
 
+    def _swap_hold_seconds(wem_id: str) -> float:
+        """Seconds to wait before touching the just-played file"""
+        fired_at = _fire_times.get(wem_id)
+        if not fired_at:
+            return 0.0
+        clip = _fire_clip.get(wem_id)
+        if not clip or clip <= 0:
+            clip = 10.0  # unknown length: wait out a conservative full clip
+        return max(0.0, fired_at + clip + _SWAP_MARGIN_S - time.monotonic())
+
     _learn_window = []  # auto-learn timestamps: new learns cap at 3 per minute (load-wave guard)
     _learn_note = [0.0]  # last overflow-verdict time, so a wave prints one line per minute
 
@@ -153,14 +167,25 @@ def watch_wems(wtray_ui, config):
                     spoken_part = f' - speaking: "{spoken}"' if spoken else ""
                     last_seen = _last_play_seen.get(wem_id)
                     gap_part = f" (again after {time.monotonic() - last_seen:.1f}s)" if last_seen else ""
-                    _last_play_seen[wem_id] = time.monotonic()
-                    print(f"[Watch] {wem_id} fired{gap_part}{spoken_part} - fetching a fresh line...")
+                    fired_at = time.monotonic()
+                    _fire_times[wem_id] = fired_at
+                    try:
+                        _fire_clip[wem_id] = wem_duration_seconds(fire_dir / f"{wem_id}.wem")
+                    except Exception:
+                        _fire_clip[wem_id] = None
+                    clip = _fire_clip.get(wem_id)
+                    clip_part = f" (clip ~{clip:.1f}s)" if clip else ""
+                    _last_play_seen[wem_id] = fired_at
+                    print(f"[Watch] {wem_id} fired{clip_part}{gap_part}{spoken_part} - fetching a fresh line...")
                 if cached_file is None:  # a refire re-fetches only when its reused pickup failed checks
                     cached_file = get_cached_wem(config, wem_id)
                 if cached_file is None:
                     if not is_retry:  # a dry cache ends the refire silently (verdict line already spoke)
                         print(f"[Watch] {wem_id} - no variant available; leaving the current file in place.")
                 else:
+                    hold = _swap_hold_seconds(wem_id)
+                    if hold > 0:
+                        time.sleep(hold)  # never swap a file the game may still be playing
                     moved_file = move_cachedfile_to_mod_dir(
                         config, cached_file, fire_dir, wem_id,
                         on_attempt=lambda: _oplock.suppress(wem_id, seconds=0.6))

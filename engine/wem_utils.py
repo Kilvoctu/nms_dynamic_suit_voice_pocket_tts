@@ -5,23 +5,68 @@ from pathlib import Path
 import time
 
 _VANILLA_CHANNEL_MASK = 0x00003102
-_VANILLA_VORBIS_SUBGUID = bytes.fromhex("33f40000d9000000b858000000000d03")
 
 
 def _patch_wem_fmt(path: Path):
-    """Rewrite the wem fmt's channel mask + Vorbis subformat GUID to vanilla's,
-    so the game's decoder plays the file instead of dropping it."""
+    """Rewrite the wem fmt's channel-layout subtype to vanilla's 0x3102 so the
+    game's decoder accepts the file. 0x42-byte wwise fmt: subtype lives at
+    payload+20; payload+24 is the sample count - the old GUID write stomped it."""
     data = bytearray(path.read_bytes())
     i = data.find(b"fmt ")
     if i < 0:
         return
     size = struct.unpack_from("<I", data, i + 4)[0]
     fmt = i + 8
-    if size < 40:
+    if size != 0x42:
         return
     struct.pack_into("<I", data, fmt + 20, _VANILLA_CHANNEL_MASK)
-    data[fmt + 24:fmt + 40] = _VANILLA_VORBIS_SUBGUID
     path.write_bytes(bytes(data))
+
+
+_STOMPED_GUID_SIGNATURE = bytes.fromhex("33f40000d9000000b858000000000d03")
+
+
+def fmt_was_guid_stomped(path: Path) -> bool:
+    """True when the file carries the old bad patch (fake GUID over sample_count)."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return False
+    i = data.find(b"fmt ")
+    if i < 0:
+        return False
+    if struct.unpack_from("<I", data, i + 4)[0] != 0x42:
+        return False
+    fmt = i + 8
+    return bytes(data[fmt + 24:fmt + 40]) == _STOMPED_GUID_SIGNATURE
+
+
+def wem_duration_seconds(path) -> float | None:
+    """Clip length in seconds from the RIFF header alone (data size / avg bytes
+    per sec) - no Vorbis decode needed. None when unreadable or implausible."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return None
+    if len(data) < 44 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        return None
+    pos = 12
+    fmt_avg = None
+    data_size = None
+    while pos + 8 <= len(data):
+        cid = data[pos:pos + 4]
+        csize = struct.unpack_from("<I", data, pos + 4)[0]
+        body = pos + 8
+        if cid == b"fmt " and csize >= 16:
+            fmt_avg = struct.unpack_from("<I", data, body + 8)[0]  # nAvgBytesPerSec
+        elif cid == b"data":
+            data_size = min(csize, len(data) - body)
+            break
+        pos = body + csize + (csize & 1)
+    if not fmt_avg or not data_size:
+        return None
+    dur = data_size / float(fmt_avg)
+    return dur if 0.05 < dur < 60.0 else None
 
 
 def convert_to_wem(config, temp_wav_path, output_path: Path):

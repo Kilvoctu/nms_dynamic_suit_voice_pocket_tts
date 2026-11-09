@@ -1,4 +1,3 @@
-sound2wem/*
 venv/
 .idea/
 .ruff_cache/
@@ -9,34 +8,18 @@ __pycache__/
 desktop.ini
 *.md
 !README.md
+*.wem
+*.wav
+nms_dsv_manager.lock
 
-# Runtime state: engine cache and personal user data (structure tracked where
-# noted, contents never overwritten by updates).
+# Runtime state: engine cache, models, and personal user data. Nothing tracked;
+# the app provisions the structure itself on first run.
 state/cache/
-state/user/*
-!state/user/.gitkeep
-!state/user/pocket_voices
-state/user/pocket_voices/*
-!state/user/pocket_voices/.gitkeep
-
-# Ignore all archived and stored material.
-archived/
-extras_put_in_mods_folder/
+state/user/
+state/models/
 
 # Downloaded external tool binaries (fetched by setup into bin/).
 /state/bin/*.exe
-
-# But keep icons/images
-!assets/**/*.png
-!assets/**/*.ico
-
-state/cache/sandbox_raw.wav
-state/cache/sandbox_processed.wav
-
-nms_dsv_manager.lock
-assets/gemma4_e2b/
-assets/gemma4_e4b/
-state/models/
 
 # PyInstaller build output (never shipped via git - built by build_exe.bat or CI)
 build/

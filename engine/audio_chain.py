@@ -9,7 +9,7 @@ WEM_ENCODER_COMPENSATION_DB = 0.4  # wav2wem encode cost ~0.3-0.4 LU by content;
 MIN_SAMPLES = 100
 CONTAINER_SR = 48000
 _FX_SR = 40000
-CHAIN_VERSION = 8  # bump to force a re-record sweep when the render chain's sound changes
+CHAIN_VERSION = 9  # bump to force a re-record sweep when the render chain's sound changes
 _FX_TAIL_LEAD_SEC = 0.25
 _FX_TAIL_REAR_SEC = 0.5
 

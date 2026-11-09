@@ -76,4 +76,5 @@ jobs:
           $extra = @()
           if ($env:PRERELEASE -eq "true") { $extra += "--prerelease" }
           if ([string]::IsNullOrWhiteSpace($env:NOTES)) { $env:NOTES = "Windows build. Unzip somewhere safe and run DSV.exe; state\ is created beside it on first run." }
-          gh release create "$env:TAG" "dist\$asset" "dist\$asset.sha256" --title "NMS Dynamic Suit Voice $env:TAG" --notes "$env:NOTES" @extra
+          $hash = (Get-FileHash "dist\$asset" -Algorithm SHA256).Hash.ToLower()
+          gh release create "$env:TAG" "dist\$asset" "dist\$asset.sha256" --title "NMS Dynamic Suit Voice $env:TAG" --notes "$($env:NOTES)`n`nSHA256: ``$hash``" @extra

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -160,10 +161,13 @@ class PresetSectionEditor(QWidget):
         return self._dirty
 
     def _set_pane_editable(self, editable: bool = True):
-        """Unlock or lock all three edit fields (built-ins are view-only)."""
+        """Unlock or lock all edit fields (built-ins are view-only)."""
         self.name_edit.setReadOnly(not editable)
         self.desc_edit.setReadOnly(not editable)
         self.prompt_edit.setReadOnly(not editable)
+        for box in (getattr(self, "min_sentences", None), getattr(self, "max_sentences", None)):
+            if box is not None:
+                box.setReadOnly(not editable)
 
     # ------------------------------------------------------------------- ui
     def _build_ui(self):
@@ -192,6 +196,21 @@ class PresetSectionEditor(QWidget):
             "One-line summary shown beside the dropdowns in the profile panel (max 120 characters)."
         )
         form.addWidget(self.desc_edit)
+        if self.section == "wordiness":
+            length_row = QHBoxLayout()
+            length_row.addWidget(QLabel("Response Length:"))
+            self.min_sentences = QSpinBox()
+            self.max_sentences = QSpinBox()
+            for box in (self.min_sentences, self.max_sentences):
+                box.setRange(1, 10)
+                box.setToolTip(
+                    "Sentence span for the notification reminder the engine appends "
+                    "after its recent lines (1-10)."
+                )
+                length_row.addWidget(box)
+            length_row.addWidget(QLabel("sentence(s)"))
+            length_row.addStretch(1)
+            form.addLayout(length_row)
         form.addWidget(QLabel("Prompt:"))
         self.prompt_edit = QPlainTextEdit()
         form.addWidget(self.prompt_edit, 1)
@@ -219,6 +238,9 @@ class PresetSectionEditor(QWidget):
         for widget in (self.name_edit, self.desc_edit):
             widget.textChanged.connect(self._mark_dirty)
         self.prompt_edit.textChanged.connect(self._mark_dirty)
+        for box in (getattr(self, "min_sentences", None), getattr(self, "max_sentences", None)):
+            if box is not None:
+                box.valueChanged.connect(self._mark_dirty)
 
     def _header_widget(self):
         """Optional widget shown above the two panes (overridden by subclasses)."""
@@ -268,6 +290,10 @@ class PresetSectionEditor(QWidget):
         self.name_edit.setText(name)
         self.desc_edit.setText(entry.get("description", ""))
         self.prompt_edit.setPlainText(entry.get("prompt", ""))
+        if hasattr(self, "min_sentences"):
+            # default span mirrors the built-in Standard preset when a field is absent
+            self.min_sentences.setValue(int(entry.get("min_sentences") or 1))
+            self.max_sentences.setValue(int(entry.get("max_sentences") or 2))
         self._set_pane_editable(not builtin_mode)
         self.save_btn.setEnabled(not builtin_mode and bool(name))
         self.delete_btn.setEnabled(self._is_user(name))
@@ -344,6 +370,9 @@ class PresetSectionEditor(QWidget):
         self.name_edit.clear()
         self.desc_edit.clear()
         self.prompt_edit.clear()
+        if hasattr(self, "min_sentences"):
+            self.min_sentences.setValue(1)
+            self.max_sentences.setValue(2)
         self.save_btn.setEnabled(True)
         self.delete_btn.setEnabled(False)
         self.dup_btn.setEnabled(False)
@@ -374,6 +403,9 @@ class PresetSectionEditor(QWidget):
         self.name_edit.setText(candidate)
         self.desc_edit.setText(entry.get("description", ""))
         self.prompt_edit.setPlainText(entry.get("prompt", ""))
+        if hasattr(self, "min_sentences"):
+            self.min_sentences.setValue(int(entry.get("min_sentences") or 1))
+            self.max_sentences.setValue(int(entry.get("max_sentences") or 2))
         self.save_btn.setEnabled(True)
         self.delete_btn.setEnabled(False)
         self.dup_btn.setEnabled(False)
@@ -401,14 +433,20 @@ class PresetSectionEditor(QWidget):
         error = self._unique_name_error(name)
         if not error and not prompt:
             error = "Prompt cannot be empty."
+        if not error and hasattr(self, "min_sentences") and self.min_sentences.value() > self.max_sentences.value():
+            error = "Response Length minimum cannot exceed the maximum."
         if error:
             self.hint_label.setText(error)
             self.hint_label.setStyleSheet(status_qss(ERROR))
             return
-        self.presets.setdefault(self.section, {})[name] = {
+        entry = {
             "prompt": prompt,
             "description": self.desc_edit.text().strip(),
         }
+        if hasattr(self, "min_sentences"):
+            entry["min_sentences"] = self.min_sentences.value()
+            entry["max_sentences"] = self.max_sentences.value()
+        self.presets.setdefault(self.section, {})[name] = entry
         self.current = name
         prompt_presets.save_presets(self.project_root, self.presets)
         self._reload_list(select=name)
@@ -480,6 +518,17 @@ class CombinationTestTab(QWidget):
 
             self._config = SuitVoiceConfig(init_llm=False)
             self._config.selection_locked = True
+        else:
+            # prompt assets live-reload, so template/preset edits reach the
+            # tester without reopening the dialog; reload resets tone/wordiness
+            # to the saved profile, so the dialog's picks ride across it
+            try:
+                tone, wordiness = self._config.current_tone, self._config.current_wordiness
+                self._config.reload_user_settings()
+                self._config.current_tone = tone
+                self._config.current_wordiness = wordiness
+            except Exception:
+                pass
         return self._config
 
     def _sync_selections(self):
@@ -563,14 +612,20 @@ class CombinationTestTab(QWidget):
         root.addWidget(QLabel("Assembled prompt (exactly what the LLM receives):"))
         self.prompt_view = QPlainTextEdit()
         self.prompt_view.setReadOnly(True)
-        self.prompt_view.setMaximumHeight(150)
-        root.addWidget(self.prompt_view)
+        root.addWidget(self.prompt_view, 3)
 
         btn_row = QHBoxLayout()
         self.generate_btn = QPushButton("Generate Test Phrase")
         self.generate_btn.setToolTip("Runs the real pipeline prompt through the local LLM (loads it on first use).")
         self.generate_btn.clicked.connect(self._on_generate)
         btn_row.addWidget(self.generate_btn)
+        self.voice_btn = QPushButton("Test Voice")
+        self.voice_btn.setToolTip(
+            "Speaks the generated phrase through the committed voice and active FX rack "
+            "(Pocket TTS loads on first use)."
+        )
+        self.voice_btn.clicked.connect(self._on_test_voice)
+        btn_row.addWidget(self.voice_btn)
         btn_row.addStretch(1)
         root.addLayout(btn_row)
 
@@ -622,6 +677,9 @@ class CombinationTestTab(QWidget):
         if not entry:
             self.prompt_view.setPlainText("")
             return
+        # keep the reader's place (cursor + scroll) across rebuilds, e.g. after Generate
+        cursor_pos = self.prompt_view.textCursor().position()
+        scroll_pos = self.prompt_view.verticalScrollBar().value()
         try:
             from engine.prompt_utils import build_suit_prompt
 
@@ -633,6 +691,11 @@ class CombinationTestTab(QWidget):
             self.prompt_view.setPlainText(prompt)
         except Exception as err:
             self.prompt_view.setPlainText(f"Prompt preview unavailable: {err}")
+            return
+        cursor = self.prompt_view.textCursor()
+        cursor.setPosition(min(cursor_pos, len(prompt)))
+        self.prompt_view.setTextCursor(cursor)
+        self.prompt_view.verticalScrollBar().setValue(scroll_pos)
 
     # ------------------------------------------------------------- generate
     def _on_generate(self):
@@ -642,6 +705,7 @@ class CombinationTestTab(QWidget):
             self.status_label.setText("Select a category and phrase first.")
             return
         self.generate_btn.setEnabled(False)
+        self.voice_btn.setEnabled(False)
         self.status_label.setStyleSheet(HINT_QSS)
         self.status_label.setText("Preparing...")
         self._thread = FunctionThread(lambda: self._generate_job(entry), self)
@@ -672,17 +736,76 @@ class CombinationTestTab(QWidget):
         if self._thread is not None:
             self._thread.emit_log(message)
 
+    # ------------------------------------------------------------- voice test
+    def _on_test_voice(self):
+        """Speak the generated phrase with the committed voice + active FX rack."""
+        text = self.output_view.toPlainText().strip()
+        if not text:
+            self.status_label.setStyleSheet(HINT_QSS)
+            self.status_label.setText("Generate a phrase first - there is nothing to speak.")
+            return
+        self.voice_btn.setEnabled(False)
+        self.generate_btn.setEnabled(False)
+        self.status_label.setStyleSheet(HINT_QSS)
+        self.status_label.setText("Preparing voice test...")
+        self._thread = FunctionThread(lambda: self._voice_test_job(text), self)
+        self._thread.log_line.connect(lambda msg: self.status_label.setText(msg))
+        self._thread.finished_ok.connect(self._on_voice_tested)
+        self._thread.failed.connect(self._on_voice_test_failed)
+        self._thread.start()
+
+    def _voice_test_job(self, text: str) -> str:
+        """Worker body: render the phrase through TTS + the active rack, then play it."""
+        import subprocess
+
+        from engine import tts_utils
+        from scipy.io import wavfile
+
+        config = self._sync_selections()
+        self.emit_status("Loading Pocket TTS engine (first use takes a moment)...")
+        wav_path = tts_utils.run_tts(config, text, "tester_voice")
+        self.emit_status("Rendered through the voice chain - playing...")
+        if getattr(config, "ffplay_path", None):
+            # Playback only: attenuate by the game's suit-voice bus amount, exactly
+            # like the Voice Modifier sandbox (the rendered wav stays untouched).
+            from ui.tabs_audio import TESTER_MIX_ATTENUATION_DB
+
+            sr, audio = wavfile.read(str(wav_path))
+            play_wav = wav_path.with_name("tester_voice_playback.wav")
+            wavfile.write(str(play_wav), int(sr), audio * (10.0 ** (TESTER_MIX_ATTENUATION_DB / 20.0)))
+            subprocess.run(
+                [str(config.ffplay_path), "-nodisp", "-autoexit", str(play_wav)],
+                check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            self.emit_status("Playback finished.")
+        else:
+            self.emit_status("Rendered OK, but ffplay.exe is missing - install tools via Setup to hear playback.")
+        return "Voice test complete."
+
+    def _on_voice_tested(self, _result):
+        self.voice_btn.setEnabled(True)
+        self.generate_btn.setEnabled(True)
+        self.status_label.setStyleSheet(status_qss(GOOD))
+        self.status_label.setText("Voice test complete.")
+
+    def _on_voice_test_failed(self, error):
+        self.status_label.setStyleSheet(status_qss(ERROR))
+        self.status_label.setText(f"Voice test failed: {error}")
+        self.voice_btn.setEnabled(True)
+        self.generate_btn.setEnabled(True)
+
     def _on_generated(self, text):
         self.output_view.setPlainText(text)
         self.status_label.setStyleSheet(HINT_QSS)
         self.status_label.setText("Prompt preview updated - the generated line joined the uniqueness list.")
         self._update_preview()  # the session dedup list grew; show next prompt's state
         self.generate_btn.setEnabled(True)
+        self.voice_btn.setEnabled(True)
 
     def _on_generate_failed(self, error):
         self.status_label.setStyleSheet(status_qss(ERROR))
         self.status_label.setText(f"Generation failed: {error}")
         self.generate_btn.setEnabled(True)
+        self.voice_btn.setEnabled(True)
 
     def release_model(self):
         """Drop the loaded LLM so the manager frees its memory when the dialog closes."""

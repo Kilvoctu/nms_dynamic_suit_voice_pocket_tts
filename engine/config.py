@@ -336,6 +336,11 @@ class SuitVoiceConfig:
             self.user_customization_path,
             self.root_dir / "state" / "user" / "active_eqfx.json",
             prompt_presets.presets_path(self.root_dir),
+            # Prompt assets reload live too, so prompt tweaks land without a restart.
+            self.suit_voice_base_path,
+            self.suit_voice_dynamic_path,
+            self.suit_voice_combat_path,
+            self.promptdata_path,
         ]
         mtimes = [p.stat().st_mtime for p in candidates if p.is_file()]
         return max(mtimes) if mtimes else 0.0
@@ -393,6 +398,14 @@ class SuitVoiceConfig:
             _track("prompt presets", self.ui_promptdata, merged_prompt_json)
             self.ui_promptdata = merged_prompt_json
             self.promptdata = build_promptdata(merged_prompt_json)
+            # Templates + pristine base re-read live (prompt file edits need no restart).
+            new_dynamic = self.suit_voice_dynamic_path.read_text(encoding="utf-8")
+            _track("dynamic prompt", self.suit_voice_dynamic, new_dynamic)
+            self.suit_voice_dynamic = new_dynamic
+            new_combat = self.suit_voice_combat_path.read_text(encoding="utf-8")
+            _track("combat prompt", self.suit_voice_combat, new_combat)
+            self.suit_voice_combat = new_combat
+            self.suit_voice_base_builtin = self.suit_voice_base_path.read_text(encoding="utf-8")
             # Active base prompt variant (user rewrite or the built-in file).
             new_base = self._resolve_base()
             _track("base prompt", self.suit_voice_base, new_base)

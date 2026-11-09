@@ -38,7 +38,7 @@ class ProfileTab(QWidget):
         row = QHBoxLayout()
         identity_layout.addLayout(row)
         row.addWidget(QLabel("Iteration Name:"))
-        self.name_edit = QLineEdit(user_data.get("player_name", "Interloper"))
+        self.name_edit = QLineEdit(user_data.get("player_name", ""))
         self.name_edit.textChanged.connect(self._refresh_briefing_text)
         row.addWidget(self.name_edit)
 
@@ -198,7 +198,7 @@ class ProfileTab(QWidget):
             return {}
 
     def _refresh_briefing_text(self):
-        current_name = self.name_edit.text().strip() or "..."
+        current_name = self.name_edit.text().strip() or "Nameless"
         # (text, bottom margin): full break between sections, half break between steps.
         paras = (
             (f"Greetings {html.escape(current_name)}!", 14),

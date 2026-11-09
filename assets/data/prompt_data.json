@@ -2,26 +2,26 @@
   "Default": "A broadcast of unknown origin has been detected on a rarely used communication channel. There appears to be a coherent signal pattern woven through seemingly random noise in the datastream.  Quantum Deciphering attempts result in unintelligible gibberish.  The datastream will be presented in unmodulated format to {name} for review.",
   "Severe Cold": "Describe conditions directly affecting {name} caused by extreme cold. Only convey how this impacts {name}; do not specify numeric values.  Vividly describe the consequences of not taking immediate action.",
   "Discovery": "{name} has made a discovery. Do not specify locations or identifiers; focus on the event and its significance for {name} alone.",
-  "Energy Shield": "Report {name}'s energy shield condition. Only convey status changes provided in input; do not infer causes or external effects.",
+  "Energy Shield": "Report {name}'s energy shield condition. Only convey status changes described in the intent below; do not infer causes or external effects.",
   "Local Hazards": "Describe any external conditions that directly affect {name}. Do not infer type, cause, or scope beyond what is explicitly supplied.  Never refer to temperature values, ranges, or changes.",
   "Extreme Conditions": "There is an extreme hazard present that is a danger to {name}. Address {name} directly as 'you'. Inform {name} of the existence of the hazard without specifying the nature of the hazard itself.",
-  "Equipment Status": "Report status of {name}'s equipment; only mention specific items if explicitly provided. Report equipment status only in general terms. Do NOT invent or name any specific device, subsystem, or array ",
+  "Equipment Status": "Report status of {name}'s equipment; only mention specific items if explicitly provided. Report equipment status only in general terms. Do not invent or name any specific device, subsystem, or array ",
   "Equipment Recharge": "Report that a technology module has been recharged. Do not refer to the amount of charge provided, what it was recharged with, or how it was recharged. Do not state which technology module was recharged.",
   "Freighter Combat": "Report that a civilian freighter is being attacked by a hostile pirate Dreadnought. Do not assume {name} is involved. Do not imply or assume {name} owned the freighter.",
   "Freighter Destroyed": "Report that a civilian freighter has been destroyed by hostile pirate forces. Do not assume {name} is involved. Do not imply or assume {name} owned the freighter.",
   "Dreadnought Disabled": "Report that a pirate Dreadnought's engines have been disabled. Do not suggest actions or speculate on consequences. Speak only in the present tense. Do not imply ownership or association with the ship.",
   "Dreadnought Departure": "Report that a pirate Dreadnought is preparing to leave the battle. Do not suggest actions or speculate on consequences. Speak only in the present tense. Do not imply ownership or association with the ship.",
   "Missile Launch": "Report that a wave of hostile missiles have been launched at a civilian freighter. Do not suggest actions or predict outcomes. Speak only in the present tense.",
-  "Missile Destroyed": "Notify {name} of a specific spaceship combat event: a wave of hostile missiles launched at nearby civilian space-freighters has been neutralized;  missile destruction is an event during a larger battle, it does NOT signal the battle is over, combat is STILL ONGOING and more missile launches are likely.",
+  "Missile Destroyed": "Notify {name} of a specific spaceship combat event: a wave of hostile missiles launched at nearby civilian space-freighters has been neutralized;  missile destruction is an event during a larger battle, it does not signal the battle is over, combat is still ongoing and more missile launches are likely.",
   "Severe Heat": "Describe conditions directly affecting {name} caused by extreme heat. Provide a vivid description of what will likely happen if {name} does not immediately take steps to remedy the situation.",
-  "Item Inventory": "Notify {name} of item-related interactions, whether it involves creation, acquisition, sale, or storage. Only include actions explicitly referenced in the input.",
+  "Item Inventory": "Notify {name} of item-related interactions, whether it involves creation, acquisition, sale, or storage. Only include actions explicitly described in the intent below.",
   "Life Support": "Inform {name} of life support issues that directly affect health status. Do not speculate on the source of the issue.  Consequences of failure to remedy the situation may be provided.",
   "Increased Funds": "Inform {name} that they have received funds.",
   "Insufficient Funds": "{name} does not have enough funds to complete the requested purchase. Do not include currency names, numbers, amounts or values.  ",
   "Navigation": "Report navigational conditions through space that affect {name}.",
-  "Notification": "Provide a unique, verbal notification to {name} in the intended tone. Only convey the input phrase; do not invent context or outcomes.",
+  "Notification": "Provide a unique, verbal notification to {name} in the intended tone. Only convey the event described in the intent below; do not invent context or outcomes.",
   "Oxygen Level": "Report oxygen levels and breathing conditions directly affecting {name}. Vividly describe the consequences of not taking immediate action.",
-  "Personal Combat": "Keep notification short, natural, and military in tone, addressing {name} directly. Do not invent or assume protective elements, weapons, or equipment. Focus only on what is directly provided in the input and how {name} will be affected. ",
+  "Personal Combat": "Keep notification short, natural, and military in tone, addressing {name} directly. Do not invent or assume protective elements, weapons, or equipment. Focus only on what is directly described in the intent below and how {name} will be affected. ",
   "Personal Protection": "Notify {name} of personal protection system performance. Only report effects explicitly mentioned; do not infer specific causes or changes.",
   "Personal Hazard Protection": "Notify {name} of hazards impacting personal safety. Do not specify hazard type or source or refer to specific temperature ranges; focus solely on the immediate or short term direct impact on {name}.",
   "Radiation Exposure": "Warn of radiation hazards affecting {name}, focusing on safety. Specify that the hazard involves radiation, do not speculate on the source or proximity. Vivid descriptions of consequences from failure to remedy the situation are encouraged.",
@@ -31,19 +31,24 @@
   "Vehicle Readiness": "Notify {name} of a vehicle's readiness, deployment, or availability for immediate use.",
   "Vehicle Status": "Describe vehicle status, focusing on effects relevant to {name}.",
   "Unused": "Placeholder",
-
   "wordiness": {
     "Standard": {
-      "prompt": "You must never repeat the input phrase or intent description verbatim or in part or with minor word or punctuation or capitalization substitutions. full Rephrasing is required. The final reworded output should consist of a maximum of two sentences.",
-      "description": "Standard length. Delivering information in one or two clear sentences."
+      "prompt": "You must never echo the intent description verbatim or in part, including minor word, punctuation, or capitalization substitutions. Full rephrasing is required.",
+      "description": "Standard length. Delivering information in one or two clear sentences.",
+      "min_sentences": 1,
+      "max_sentences": 2
     },
     "Verbose": {
-      "prompt": "You must never repeat the input phrase verbatim or with minor word or punctuation or capitalization substitutions. Rephrasing is required. The final output should be a minimum of three sentences to a maximum of 5 sentences. ",
-      "description": "Longer response length. Elaborates on information with three to five full sentences."
+      "prompt": "You must never echo the intent description verbatim or with minor word, punctuation, or capitalization substitutions. Rephrasing is required.",
+      "description": "Longer response length. Elaborates on information with three to five full sentences.",
+      "min_sentences": 3,
+      "max_sentences": 5
     },
     "Observer": {
-      "prompt": "Deliver a concise description of a single specific event in exactly one properly punctuated sentence. You must never repeat the input phrase verbatim or with minor word, punctuation, or capitalization substitutions. Do not speculate about outcomes or suggest actions. Do not refer to {name} or imply ownership or possession.",
-      "description": "Ultra-short. A single, strict sentence under ten words with no personal names."
+      "prompt": "You must never echo the intent description verbatim or with minor word, punctuation, or capitalization substitutions. Do not speculate about outcomes or suggest actions. Do not refer to {name} or imply ownership or possession.",
+      "description": "Ultra-short. A single, strict sentence under ten words with no personal names.",
+      "min_sentences": 1,
+      "max_sentences": 1
     }
   },
   "tones": {

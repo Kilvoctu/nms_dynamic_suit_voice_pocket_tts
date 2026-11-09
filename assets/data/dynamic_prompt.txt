@@ -1,11 +1,15 @@
 {wordiness_prompt}
+
 {tone_prompt}
-YOU ARE SPEAKING DIRECTLY TO {name} - DO NOT EVER INSULT THEM BY REFERRING TO THEM IN THIRD PERSON.
-MANDATORY INSTRUCTION: {category_context}
+
+{name_instruction}
+Mandatory instruction: {category_context}
 
 Current notification ({category_type} - {input_intent}):
-{input_phrase}
+Rewrite the notification event entirely in your own words.
 
-Each sentence in your output must be unique and never include phrasing that matches or re-uses any phrases or
-distinct elements out of the following list:
+Do not reuse phrasing or distinct elements from the lines below.
+Vary your wording: when a term already appears, prefer a fresh synonym or refer to the subject indirectly:
 {recent_lines}
+
+{length_reminder}

@@ -191,7 +191,7 @@ class MainWindow(QMainWindow):
                 updated.setdefault("models", {})["llm_variant"] = system_tab.model_combo.currentData() or "e2b"
         updated.setdefault("tts_voice", "fantine")
         if profile_tab is not None:
-            updated["player_name"] = profile_tab.name_edit.text().strip() or "Interloper"
+            updated["player_name"] = profile_tab.name_edit.text().strip()
             updated["phrase_settings"] = {
                 "tone": profile_tab.tone_combo.currentText(),
                 "wordiness": profile_tab.wordiness_combo.currentText(),

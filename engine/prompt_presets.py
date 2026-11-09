@@ -18,11 +18,16 @@ def presets_path(root_dir) -> Path:
 
 
 def _clean_entry(entry, text_key: str):
-    """Normalize one preset entry to {text_key, description} ('' values kept)."""
-    return {
+    """Normalize one preset entry to {text_key, description} ('' values kept).
+    Verbiage sentence-span fields ride along when present."""
+    clean = {
         text_key: str(entry.get(text_key, "")),
         "description": str(entry.get("description", "")),
     }
+    for field in ("min_sentences", "max_sentences"):
+        if field in entry:
+            clean[field] = entry[field]
+    return clean
 
 
 def load_presets(root_dir) -> dict:
@@ -84,7 +89,10 @@ def merge_promptdata(builtin: dict, presets: dict) -> dict:
         for name, entry in (presets.get(section) or {}).items():
             if name in base:
                 continue
-            base[name] = entry["prompt"] if isinstance(entry, dict) else entry
+            if section == "wordiness" and isinstance(entry, dict):
+                base[name] = entry  # keep the structured span fields
+            else:
+                base[name] = entry["prompt"] if isinstance(entry, dict) else entry
         merged[section] = base
     return merged
 

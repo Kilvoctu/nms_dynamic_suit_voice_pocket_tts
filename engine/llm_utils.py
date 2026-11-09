@@ -12,12 +12,11 @@ def reword_phrase(config, wem_id_r,
         try:
             output = config.llm.create_chat_completion(
                 messages=messages,
-                max_tokens=512,  # Gemma-4 answers directly (no hidden thinking); 512 caps rambling
+                max_tokens=512,
                 temperature=1.0,
                 top_p=0.95,
                 top_k=100,
                 repeat_penalty=1.25,
-                seed=-1,  # must add this to randomize the results
             )
             result = output["choices"][0]["message"]["content"].strip()
             result = postprocess_for_tts(result)
@@ -63,8 +62,9 @@ def add_final_output_line(config, wem_id, line):
     if wem_id not in config.recent_lines_text:
         config.recent_lines_text[wem_id] = []
 
-    # Split on sentence-ending punctuation or certain common words, keep trailing whitespace
-    split_pattern = r'(?<=[.!?])|(?=\bwith\b)|(?=\band\b)|(?=\bfor\b)|(?=\bof\b)'
+    # Split on sentence-ending punctuation, semicolons/colons, or certain common words, keep trailing whitespace
+    split_pattern = (r'(?<=[.!?;:])|(?=\bwith\b)|(?=\band\b)|(?=\bfor\b)'
+                     r'|(?=\bof\b)|(?=\bbut\b)|(?=\byet\b)')
     sublines = [s.strip() for s in re.split(split_pattern, line) if s.strip()]
 
     lines = config.recent_lines_text[wem_id]

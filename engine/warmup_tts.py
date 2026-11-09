@@ -5,12 +5,12 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from engine import tts_utils
+from engine import path_utils, tts_utils
 
 
 def main():
     print("Pipeline: Starting Pocket TTS warmup (first run downloads model weights)...")
-    project_root = Path(__file__).parent.parent.absolute()
+    project_root = path_utils.project_root()
 
     # Defaults live in code; the untracked user config is the only override source.
     pocket_model = tts_utils.POCKET_DEFAULT_MODEL
@@ -40,8 +40,10 @@ def main():
         tts_utils._write_wav(wav_path, audio, sr)
         print(f"TTS warmup complete. Verification test file generated safely: {wav_path}")
 
-        # Best-effort end-to-end check through the wem encoder
+        # Best-effort end-to-end check through the wem encoder (state copy, else bundled one)
         wav2wem = project_root / "state" / "bin" / "wav2wem.exe"
+        if not wav2wem.is_file():
+            wav2wem = path_utils.assets_root() / "bin" / "wav2wem.exe"
         if wav2wem.is_file():
             import subprocess
             wem_path = project_root / "state" / "cache" / "tmp_wem_dir" / "warmup.wem"

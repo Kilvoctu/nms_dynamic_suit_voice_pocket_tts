@@ -455,7 +455,7 @@ class AudioTab(QWidget):
             "#AudioTab QLabel { background: transparent; }"
         )
         self.window = window
-        self.builtin_file = window.project_root / "assets" / "data" / "eqfx_presets.json"
+        self.builtin_file = window.assets_root / "assets" / "data" / "eqfx_presets.json"
         self.user_eqfx_dir = window.project_root / "state" / "user" / "eqfx"
         self.active_file = window.project_root / "state" / "user" / "active_eqfx.json"
         self.builtin_presets = self._read_json_map(self.builtin_file, "eqfx_presets.json")
@@ -1416,15 +1416,17 @@ class AudioTab(QWidget):
 
         stats = {"lufs": round(audio_chain.integrated_loudness(audio, sr), 1),
                  "peak": round(float(np.max(np.abs(audio))), 2)}
-        ffplay_bin = str(heavy_cfg.ffmpeg_path.parent / "ffplay.exe")
-        self._test_thread.emit_log(" Footprints generated successfully! Triggering playback stream...")
-        # Playback only: attenuate by the game suit-voice bus's amount so the
-        # sandbox approximates in-game loudness (the written wav stays untouched).
-        play_wav = cache_dir / "sandbox_playback.wav"
-        write_wav_float(play_wav, audio * (10.0 ** (TESTER_MIX_ATTENUATION_DB / 20.0)), sr)
-        subprocess.run([
-            ffplay_bin, "-nodisp", "-autoexit", str(play_wav)
-        ], check=True, creationflags=_CREATE_NO_WINDOW)
+        if heavy_cfg.ffplay_path:
+            self._test_thread.emit_log(" Footprints generated successfully! Triggering playback stream...")
+            # Playback only: attenuate by the game suit-voice bus's amount so the
+            # sandbox approximates in-game loudness (the written wav stays untouched).
+            play_wav = cache_dir / "sandbox_playback.wav"
+            write_wav_float(play_wav, audio * (10.0 ** (TESTER_MIX_ATTENUATION_DB / 20.0)), sr)
+            subprocess.run([
+                str(heavy_cfg.ffplay_path), "-nodisp", "-autoexit", str(play_wav)
+            ], check=True, creationflags=_CREATE_NO_WINDOW)
+        else:
+            self._test_thread.emit_log(" ffplay.exe not found - install tools via Setup to hear playback.")
         self._test_thread.emit_log(" Playback loop finished smoothly.")
         return stats
 

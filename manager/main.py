@@ -5,11 +5,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Under pythonw.exe there is no console: sys.stdout/stderr are None. Route
-# them to a file so prints, tracebacks and Qt warnings stay recoverable.
+from engine.path_utils import assets_root, is_frozen, project_root
+
+# Under pythonw.exe (and the consoleless frozen exe) there is no console:
+# sys.stdout/stderr are None. Route them to a file so prints, tracebacks and
+# Qt warnings stay recoverable.
 if sys.stdout is None or sys.stderr is None:
     try:
-        _stdio_log = Path(__file__).parent.parent / "state" / "cache" / "manager_stdout.log"
+        _stdio_log = project_root() / "state" / "cache" / "manager_stdout.log"
         _stdio_log.parent.mkdir(parents=True, exist_ok=True)
         sys.stdout = open(_stdio_log, "a", encoding="utf-8", buffering=1)
         sys.stderr = sys.stdout
@@ -22,7 +25,7 @@ def _fail(exc: BaseException) -> None:
     detail = traceback.format_exc()
     print(detail, file=sys.stderr)
     try:
-        log_dir = Path(__file__).parent.parent / "state" / "cache"
+        log_dir = project_root() / "state" / "cache"
         log_dir.mkdir(parents=True, exist_ok=True)
         (log_dir / "manager_crash.log").write_text(detail, encoding="utf-8")
         _boot_log(f"CRASH: {detail}")
@@ -46,7 +49,7 @@ def _fail(exc: BaseException) -> None:
 def _boot_log(message: str) -> None:
     """Append a boot milestone so a native crash still shows the last completed stage."""
     try:
-        log_dir = Path(__file__).parent.parent / "state" / "cache"
+        log_dir = project_root() / "state" / "cache"
         log_dir.mkdir(parents=True, exist_ok=True)
         with open(log_dir / "manager_boot.log", "a", encoding="utf-8") as f:
             f.write(f"{message}\n")
@@ -58,7 +61,7 @@ def _acquire_instance_lock():
     """Single-instance lock beside the app; per-user app-data as a fallback."""
     from PySide6.QtCore import QLockFile, QStandardPaths
 
-    lock_dir = Path(__file__).parent.parent
+    lock_dir = project_root()
     try:
         lock_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -78,35 +81,27 @@ def _main() -> None:
     from ui.main_window import MainWindow
     from ui.style import APP_QSS
 
-    expected_dir = (Path(__file__).parent.parent / "venv" / "Scripts").resolve()
-    if Path(sys.executable).resolve().parent != expected_dir:
-        _boot_log(f"WRONG INTERPRETER: {sys.executable}")
-        _ = QApplication.instance() or QApplication(sys.argv)
-        QMessageBox.critical(
-            None, "NMS DSV Manager",
-            "The Management Utility was launched outside its virtual environment.\n\n"
-            "Please start it via run_manager.cmd so dependencies and self-repair work.",
-        )
-        sys.exit(1)
+    if not is_frozen():  # the frozen exe always runs its bundled interpreter
+        expected_dir = (project_root() / "venv" / "Scripts").resolve()
+        if Path(sys.executable).resolve().parent != expected_dir:
+            _boot_log(f"WRONG INTERPRETER: {sys.executable}")
+            _ = QApplication.instance() or QApplication(sys.argv)
+            QMessageBox.critical(
+                None, "NMS DSV Manager",
+                "The Management Utility was launched outside its virtual environment.\n\n"
+                "Please start it with the project venv (python main.py - see README).",
+            )
+            sys.exit(1)
 
     _boot_log("--- manager session start ---")
     _boot_log("imports ok")
-
-    # Named interpreter copies (Task Manager clarity); silent no-op outside the venv.
-    try:
-        from interpreter_copies import ensure_copies
-        made = ensure_copies(Path(__file__).parent.parent)
-        if made:
-            _boot_log(f"interpreter copies ready: {', '.join(sorted(made))}")
-    except Exception as e:
-        _boot_log(f"interpreter copies skipped: {e}")
 
     def _event_loop_hook(exc_type, exc, tb):
         """PySide6 aborts natively on unhandled slot exceptions; this hook still logs the traceback."""
         detail = "".join(traceback.format_exception(exc_type, exc, tb))
         print(detail, file=sys.stderr)
         try:
-            (Path(__file__).parent.parent / "state" / "cache" / "manager_crash.log").write_text(
+            (project_root() / "state" / "cache" / "manager_crash.log").write_text(
                 detail, encoding="utf-8"
             )
             _boot_log(f"EVENT LOOP CRASH: {exc_type.__name__}: {exc}")
@@ -117,7 +112,7 @@ def _main() -> None:
 
     app = QApplication(sys.argv)
     app.setApplicationName("NMS Dynamic Suit Voice")
-    app.setWindowIcon(QIcon(str(Path(__file__).parent.parent / "assets" / "nms_dsv.png")))
+    app.setWindowIcon(QIcon(str(assets_root() / "assets" / "nms_dsv.png")))
     app.setStyleSheet(APP_QSS)  # group-box bevels + slim scrollbars, app-wide
     _boot_log("QApplication created")
 

@@ -1,5 +1,5 @@
 # manager/setup_runner.py
-"""One-click setup pipeline - deliberately stdlib-only (runs before the venv exists)."""
+"""One-click setup pipeline - deliberately stdlib-only (runs before heavy deps)."""
 import hashlib
 import json
 import shutil
@@ -10,38 +10,42 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.parent.absolute()
-
-# Shared resolver (stdlib-only module - safe to import before deps exist)
-sys.path.insert(0, str(PROJECT_ROOT))
 from engine.path_utils import (
     LLM_VARIANTS,
     STARTER_WEMS_SUBPATH,
     active_llm_variant,
+    assets_root,
+    is_frozen,
+    project_root,
     resolve_mod_root,
     resolve_mod_wem_dir,
 )
 
+PROJECT_ROOT = project_root()
+ASSETS_ROOT = assets_root()
+
 WAV2WEM_URL = "https://github.com/pas2k/wav2wem/releases/download/v0.1/wav2wem.exe"
 WAV2WEM_SHA256 = "5a10738a73d5451ede6a526a7aa0bfe7f42b41faffe78c9b62ec9f223f91d736"
-FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip"
-FFMPEG_ZIP_BIN_DIR = "ffmpeg-master-latest-win64-lgpl/bin"
-STARTER_WEMS_RELATIVE = STARTER_WEMS_SUBPATH
+# The ffmpeg release zip carries everything; only ffplay.exe is used for the tester.
+FFPLAY_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip"
+FFPLAY_ZIP_BIN_DIR = "ffmpeg-master-latest-win64-lgpl/bin"
 
 
 def is_setup_complete(project_root: Path = PROJECT_ROOT) -> bool:
     """Stdlib-only readiness probe: True when the utility can run every tab
     and the game pipeline has everything it needs."""
     pr = Path(project_root)
-    if not (pr / "venv/Scripts/python.exe").is_file():
-        return False
-    if not (pr / "venv/Lib/site-packages/pocket_tts").exists():
-        return False
-    if not (pr / "state/bin/ffmpeg.exe").is_file():
+    if not is_frozen():
+        # Source runs still need the Python environment; the frozen exe ships one.
+        if not (pr / "venv/Scripts/python.exe").is_file():
+            return False
+        if not (pr / "venv/Lib/site-packages/pocket_tts").exists():
+            return False
+    if not (pr / "state/bin/ffplay.exe").is_file():
         return False
     if not (pr / "state/bin/wav2wem.exe").is_file():
         return False
-    if not any((pr / "assets").glob("*/*.gguf")):
+    if not any((pr / "state" / "models").glob("*/*.gguf")):
         return False
 
     try:
@@ -94,6 +98,7 @@ class SetupRunner:
 
     # ------------- individual steps -------------
     def step_venv_and_deps(self):
+        """Source-run only: the frozen exe ships its own bundled interpreter."""
         venv_dir = self.project_root / "venv"
         if not (venv_dir / "Scripts" / "python.exe").is_file():
             self.log("Creating virtual environment (venv/)...")
@@ -118,45 +123,47 @@ class SetupRunner:
             raise RuntimeError(f"pip install failed:\n{tail}")
         self.log(f"  dependencies installed in {time.monotonic() - started:.1f}s")
 
-    def step_named_copies(self):
-        """Named interpreter copies for Task Manager clarity (best-effort; the
-        plain pythonw fallback keeps everything working without them)."""
-        try:
-            sys.path.insert(0, str(Path(__file__).parent))
-            from interpreter_copies import ensure_copies
-            made = ensure_copies(self.project_root)
-        except Exception:
-            made = {}
-        if made:
-            self.log(f"  named process copies ready: {', '.join(sorted(made))}.")
-        else:
-            self.log("  named process copies skipped (plain pythonw will be used).")
-
-    def step_ffmpeg(self):
-        ffmpeg_exe = self.project_root / "state" / "bin" / "ffmpeg.exe"
-        if ffmpeg_exe.is_file():
-            self.log("ffmpeg already present, skipping download.")
+    def step_tools_from_bundle(self):
+        """Frozen runs ship the tools inside the bundle: seed copies into state/bin
+        so the user folder owns every tool (idempotent, one-time)."""
+        if not is_frozen():
             return
-        self.log("Downloading ffmpeg (static build, ffmpeg + ffplay, approx 260 MB)...")
-        zip_path = self.project_root / "ffmpeg-temp.zip"
-        extract_dir = self.project_root / "ffmpeg-temp"
+        bin_dir = self.project_root / "state" / "bin"
+        for name in ("ffplay.exe", "wav2wem.exe"):
+            dest = bin_dir / name
+            if dest.is_file():
+                self.log(f"  {name} already present in state/bin.")
+                continue
+            bundled = assets_root() / "bin" / name
+            if bundled.is_file():
+                bin_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(bundled, dest)
+                self.log(f"  {name} seeded into state/bin from the bundle.")
+
+    def step_ffplay(self):
+        ffplay_exe = self.project_root / "state" / "bin" / "ffplay.exe"
+        if ffplay_exe.is_file():
+            self.log("ffplay already present, skipping download.")
+            return
+        self.log("Downloading ffplay (playback tester; zip carries ffmpeg too, only ffplay is kept)...")
+        zip_path = self.project_root / "ffplay-temp.zip"
+        extract_dir = self.project_root / "ffplay-temp"
         try:
-            self._download(FFMPEG_URL, zip_path, "ffmpeg")
+            self._download(FFPLAY_URL, zip_path, "ffplay")
             with zipfile.ZipFile(zip_path) as z:
                 z.extractall(extract_dir)
-            bin_dir = extract_dir / FFMPEG_ZIP_BIN_DIR
-            tools_dir = self.project_root / "bin"
-            tools_dir.mkdir(exist_ok=True)
-            for name in ("ffmpeg.exe", "ffplay.exe"):
-                shutil.copy2(bin_dir / name, tools_dir / name)
+            bin_dir = extract_dir / FFPLAY_ZIP_BIN_DIR
+            tools_dir = self.project_root / "state" / "bin"
+            tools_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(bin_dir / "ffplay.exe", tools_dir / "ffplay.exe")
         finally:
             if zip_path.exists():
                 zip_path.unlink()
             if extract_dir.exists():
                 shutil.rmtree(extract_dir)
-        if not ffmpeg_exe.is_file():
-            raise RuntimeError("ffmpeg.exe not found after extraction.")
-        self.log("  ffmpeg ready.")
+        if not ffplay_exe.is_file():
+            raise RuntimeError("ffplay.exe not found after extraction.")
+        self.log("  ffplay ready.")
 
     def step_wav2wem(self):
         exe = self.project_root / "state" / "bin" / "wav2wem.exe"
@@ -200,7 +207,7 @@ class SetupRunner:
         self.log(f"  {label} ready.")
 
     def step_starter_wems(self):
-        starter = self.project_root / STARTER_WEMS_RELATIVE
+        starter = assets_root() / STARTER_WEMS_SUBPATH  # bundled copy when frozen
         self.mod_wem_dir.mkdir(parents=True, exist_ok=True)
         copied = 0
         total = 0
@@ -228,6 +235,24 @@ class SetupRunner:
 
     def step_warmup(self):
         self.log("Warming up the TTS engine and ALL voices (downloads per-voice assets on first run; may take a while)...")
+        if is_frozen():
+            # In-process warmup: the exe already bundles the runtime and engine.
+            import io
+            from contextlib import redirect_stdout
+
+            from engine import warmup_tts
+
+            sink = io.StringIO()
+            try:
+                with redirect_stdout(sink):
+                    warmup_tts.main()
+            except SystemExit as code:
+                if code.code not in (0, None):
+                    raise RuntimeError("TTS warmup failed (see state/cache/manager_stdout.log).") from None
+            for line in sink.getvalue().splitlines()[-12:]:
+                self.log(f"  {line}")
+            self.log("  TTS engine warm and verified end-to-end.")
+            return
         result = subprocess.run(
             [self._venv_python(), "engine/warmup_tts.py"],
             cwd=self.project_root, capture_output=True, text=True,
@@ -242,11 +267,13 @@ class SetupRunner:
 
     # ------------- orchestrator -------------
     def run(self):
-        steps = [
-            ("Python environment", self.step_venv_and_deps),
-            ("Named process copies", self.step_named_copies),
-            ("ffmpeg", self.step_ffmpeg),
-            ("wav2wem encoder", self.step_wav2wem),
+        steps = []
+        if not is_frozen():
+            steps.append(("Python environment", self.step_venv_and_deps))
+        steps += [
+            ("Bundled tool seeding", self.step_tools_from_bundle),
+            ("wave encoder", self.step_wav2wem),
+            ("ffplay player", self.step_ffplay),
             ("LLM rephrasing model", self.step_model),
             ("Starter voice files", self.step_starter_wems),
             ("Register mod directory", self.step_register_mod_dir),

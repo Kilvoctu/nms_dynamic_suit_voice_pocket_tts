@@ -5,7 +5,7 @@ import os
 import time
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from engine.path_utils import project_root as PROJECT_ROOT  # write-able anchor (exe dir when frozen)
 
 _TITLE_PREFIX = "Dynamic Suit Voice - "
 

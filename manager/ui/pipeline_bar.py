@@ -232,12 +232,13 @@ class PipelineBar(QFrame):
             self._log_handle = open(log_path, "ab")
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
         env = dict(os.environ, PYTHONUNBUFFERED="1")  # live log lines, not block-buffered
-        # Prefer the named engine copy (Task Manager clarity); plain pythonw is the fallback.
-        engine_exe = self.window.project_root / "venv" / "Scripts" / "NMS_DSV_Engine.exe"
-        interpreter = str(engine_exe if engine_exe.is_file() else sys.executable)
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable, "--managed"]
+        else:
+            cmd = [sys.executable, str(self.window.project_root / "main.py"), "--managed"]
         try:
             self._process = subprocess.Popen(
-                [interpreter, str(self.window.project_root / "main.py"), "--managed"],
+                cmd,
                 cwd=str(self.window.project_root),
                 stdout=self._log_handle,
                 stderr=subprocess.STDOUT,

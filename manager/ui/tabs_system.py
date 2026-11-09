@@ -177,9 +177,9 @@ class SystemTab(QWidget):
         self.setup_btn.clicked.connect(self._run_setup)
         self.setup_btn.setToolTip(
             "One-time installation: creates the venv, downloads dependencies,\n"
-            "ffmpeg, the wav2wem encoder and the local LLM model(s) (~3 GB total;\n"
-            "the E4B variant adds ~4.6 GB when it is selected in Advanced Settings),\n"
-            "then copies the starter voice files into your mod directory."
+            "the ffplay player, the wav2wem encoder and the local LLM model(s)\n"
+            "(~3 GB total; the E4B variant adds ~4.6 GB when it is selected in\n"
+            "Advanced Settings), then copies the starter voice files into your mod directory."
         )
         setup_layout.addWidget(self.setup_btn)
 
@@ -539,9 +539,9 @@ class SystemTab(QWidget):
         if QMessageBox.question(
             self, "Confirm Setup",
             f"Voice files will be installed into:\n{mod_wem_dir}\n\n"
-            "This also creates the venv, downloads dependencies, ffmpeg, the wav2wem\n"
-            "encoder and the local LLM model(s) (approx 3 GB; the E4B variant adds\n"
-            "~4.6 GB when selected in Advanced Settings). Continue?",
+            "This also creates the venv, downloads dependencies, the ffplay player,\n"
+            "the wav2wem encoder and the local LLM model(s) (~3 GB; the E4B variant\n"
+            "adds ~4.6 GB when selected in Advanced Settings). Continue?",
         ) != QMessageBox.StandardButton.Yes:
             return
 

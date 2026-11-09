@@ -36,3 +36,10 @@ state/cache/sandbox_processed.wav
 nms_dsv_manager.lock
 assets/gemma4_e2b/
 assets/gemma4_e4b/
+state/models/
+
+# PyInstaller build output (never shipped via git - built by build_exe.bat or CI)
+build/
+dist/
+ffplay-temp.zip
+ffplay-temp/

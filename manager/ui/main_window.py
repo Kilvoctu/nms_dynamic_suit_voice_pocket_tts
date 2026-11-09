@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from engine.config import ENVIRONMENT_DEFAULTS
-from engine.path_utils import is_pipeline_running
+from engine.path_utils import assets_root, is_pipeline_running, project_root
 from ui.style import WARN
 from ui.pipeline_bar import _CLOSE_FORCE_AFTER_S, PipelineBar
 from ui.tabs_audio import AudioTab
@@ -39,7 +39,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        self.project_root = Path(__file__).parent.parent.parent
+        self.project_root = project_root()   # write-able anchor (exe dir when frozen)
+        self.assets_root = assets_root()  # read-only bundled assets (repo tree when unfrozen)
         self.user_config_file = self.project_root / "state" / "user" / "user_customization.json"
         self._threads = []
         self._resize_drag_edges = None
@@ -61,7 +62,7 @@ class MainWindow(QMainWindow):
 
         self.title_bar = TitleBar(
             self, "NMS Dynamic Suit Voice - Management Utility",
-            icon_path=str(self.project_root / "assets" / "nms_dsv.png"),
+            icon_path=str(self.assets_root / "assets" / "nms_dsv.png"),
         )
         root_layout.addWidget(self.title_bar)
 
@@ -131,7 +132,7 @@ class MainWindow(QMainWindow):
 
         self.available_tones = ["Standard"]
         self.available_wordiness = ["Standard"]
-        prompt_file = self.project_root / "assets" / "data" / "prompt_data.json"
+        prompt_file = self.assets_root / "assets" / "data" / "prompt_data.json"
         if prompt_file.exists():
             try:
                 pdata = json.loads(prompt_file.read_text(encoding="utf-8"))
@@ -215,7 +216,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------- tray icon
     def _setup_tray_icon(self):
         """Tray presence while the utility is open: live pipeline state, Start/Stop and window restore."""
-        icon_path = self.project_root / "assets" / "nms_dsv.png"
+        icon_path = self.assets_root / "assets" / "nms_dsv.png"
         self.tray_icon = QSystemTrayIcon(QIcon(str(icon_path)), self)
         self.tray_icon.setToolTip("NMS Dynamic Suit Voice - Manager")
 

@@ -12,6 +12,7 @@ from queue import PriorityQueue
 from pathlib import Path
 from engine.cache_replenishment import rephrase_replacement_line, render_replacement_line
 from engine.audio_chain import CHAIN_VERSION
+from engine.path_utils import project_root
 
 # Two lanes: rush (priority 0, lines the player waits on) and fill (10 = the
 # voice-file sweep, 20 = restock core, 30 = filler).
@@ -186,7 +187,7 @@ def start_worker():
         _rush_worker_thread.start()
 
 # Per-line play counts, persisted: filler depth concentrates on lines the game actually fires.
-_play_counts_path = Path(__file__).resolve().parents[1] / "state" / "cache" / "play_counts.json"
+_play_counts_path = project_root() / "state" / "cache" / "play_counts.json"
 _play_counts: dict = {}
 try:
     _play_counts = json.loads(_play_counts_path.read_text(encoding="utf-8"))

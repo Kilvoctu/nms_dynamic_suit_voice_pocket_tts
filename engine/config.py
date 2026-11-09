@@ -12,7 +12,10 @@ from engine.prompt_utils import build_promptdata
 from engine.path_utils import (
     DEFAULT_LLM_VARIANT,
     active_llm_variant,
+    assets_root,
     llm_variant_gguf,
+    migrate_legacy_ggufs,
+    project_root,
     resolve_mod_wem_dir,
 )
 
@@ -45,14 +48,14 @@ ENVIRONMENT_DEFAULTS = {
     },
     "models": {
         "llm_variant": "e2b",
-        "llm_model": "assets/gemma4_e2b/gemma-4-E2B-it-Q4_K_M.gguf",
+        "llm_model": "state/models/gemma4_e2b/gemma-4-E2B-it-Q4_K_M.gguf",
         "pocket_model": "english_2026-10",
         "pocket_tts_max_tokens": 100,
     },
     "external_tools": {
         "wav2wem_path": "state/bin/wav2wem.exe",
         "wav2wem_quality": 6,
-        "ffmpeg_path": "state/bin/ffmpeg.exe",
+        "ffplay_path": "state/bin/ffplay.exe",
     },
 }
 
@@ -123,9 +126,11 @@ def deep_merge(base: dict, override: dict) -> dict:
 
 class SuitVoiceConfig:
     def __init__(self, init_llm: bool = True):
-        # Anchor to project root (parent of engine/)
-        root_dir = Path(__file__).parent.parent
+        # Write-able root: the exe's folder when frozen, repo root otherwise (state/ lives below it).
+        root_dir = project_root()
         self.root_dir = root_dir
+        self.assets_dir = assets_root()  # read-only bundled assets anchor (repo tree when unfrozen)
+        migrate_legacy_ggufs(root_dir)  # fold pre-standalone assets/gemma4_* downloads into state/models
 
         # Hardcoded defaults (deep-copied so runtime mutation never bleeds into
         # the module constants); personal values override via the user config.
@@ -160,7 +165,7 @@ class SuitVoiceConfig:
         self.mod_dir = resolve_mod_wem_dir(mod_dir_setting) if mod_dir_setting else None
 
         # Tray App UI Icon (Force to clean string format for PIL/pystray compatibility)
-        icon_path_obj = self.resolve_json_path(paths.get("icon_image"), root_dir, must_exist=True)
+        icon_path_obj = self.resolve_json_path(paths.get("icon_image"), self.assets_dir, must_exist=True)
         self.icon_image = str(icon_path_obj)
 
         # Engine Cache Locations (Will be auto-provisioned safely below)
@@ -179,22 +184,27 @@ class SuitVoiceConfig:
         # ====================================================
         # EXTERNAL SYSTEM UTILITIES (environment_config -> "external_tools")
         ext_tools = self.environment.get("external_tools", {})
-        self.wav2wem_path = self.resolve_json_path(ext_tools.get("wav2wem_path"), root_dir, must_exist=True)
+        wav2wem = self.resolve_json_path(ext_tools.get("wav2wem_path") or "state/bin/wav2wem.exe", root_dir, must_exist=False)
+        if not wav2wem.is_file():
+            bundled = self.assets_dir / "bin" / "wav2wem.exe"  # PyInstaller bundle fallback (frozen)
+            if bundled.is_file():
+                wav2wem = bundled
+        self.wav2wem_path = wav2wem
         self.wav2wem_quality = ext_tools.get("wav2wem_quality", 6)
 
         # --- PROMPT ASSETS & FILES ---
         files = self.llm_prompting.get("files", {})
-        self.transcripts_path = self.resolve_json_path(files.get("transcripts_path"), root_dir, must_exist=True) # JSON for intent mapping
+        self.transcripts_path = self.resolve_json_path(files.get("transcripts_path"), self.assets_dir, must_exist=True) # JSON for intent mapping
         self.intent_map = json.loads(self.transcripts_path.read_text(encoding="utf-8")) # JSON for intent mapping
 
-        self.suit_voice_base_path = self.resolve_json_path(files.get("base_prompt"), root_dir, must_exist=True)
+        self.suit_voice_base_path = self.resolve_json_path(files.get("base_prompt"), self.assets_dir, must_exist=True)
         self.suit_voice_base = self.suit_voice_base_path.read_text(encoding="utf-8")
         self.suit_voice_base_builtin = self.suit_voice_base  # pristine built-in for base-prompt switching
 
-        self.suit_voice_dynamic_path = self.resolve_json_path(files.get("dynamic_prompt"), root_dir, must_exist=True)
+        self.suit_voice_dynamic_path = self.resolve_json_path(files.get("dynamic_prompt"), self.assets_dir, must_exist=True)
         self.suit_voice_dynamic = self.suit_voice_dynamic_path.read_text(encoding="utf-8")
 
-        self.suit_voice_combat_path = self.resolve_json_path(files.get("combat_prompt"), root_dir, must_exist=True)
+        self.suit_voice_combat_path = self.resolve_json_path(files.get("combat_prompt"), self.assets_dir, must_exist=True)
         self.suit_voice_combat = self.suit_voice_combat_path.read_text(encoding="utf-8")
 
         # --- COMBAT / CATEGORY METRIC SETTING ---
@@ -209,7 +219,7 @@ class SuitVoiceConfig:
         self.player_name = self.customization.get("player_name", "Interloper")
         phrase_settings = self.customization.get("phrase_settings", {})
         # --- Inside your Config Class Initialization ---
-        self.promptdata_path = self.resolve_json_path(files.get("prompt_data"), root_dir, must_exist=True)
+        self.promptdata_path = self.resolve_json_path(files.get("prompt_data"), self.assets_dir, must_exist=True)
         raw_prompt_json = json.loads(self.promptdata_path.read_text(encoding="utf-8"))
         raw_prompt_json = self._merge_prompt_presets(raw_prompt_json)
 
@@ -238,22 +248,22 @@ class SuitVoiceConfig:
 
             self.eqfx_active = preset_from_legacy(self.voice_effects)
 
-        # FFMPEG Binary Resolution
-        ext_cfg = self.environment.get("external_tools", {})
-        ffmpeg_path = shutil.which("ffmpeg")
-        if not ffmpeg_path:
-            # Fallback config option must resolve to an ABSOLUTE path: a relative
-            # entry breaks bare "ffmpeg" subprocess calls when the CWD differs.
-            ffmpeg_env = ext_cfg.get("ffmpeg_path") or ext_cfg.get("ffmpeg_cmd")
-            if ffmpeg_env:
-                ffmpeg_path = Path(ffmpeg_env.strip('"'))
-                if not ffmpeg_path.is_absolute():
-                    ffmpeg_path = root_dir / ffmpeg_path
-                ffmpeg_path = ffmpeg_path.resolve()
-                os.environ["PATH"] = str(ffmpeg_path.parent) + ";" + os.environ.get("PATH", "")
-            else:
-                raise SystemExit("ffmpeg not found on PATH. Please install ffmpeg or set up path contexts.")
-        self.ffmpeg_path = Path(ffmpeg_path)
+        # FFPLAY Binary Resolution: bare PATH probe > user folder state/bin > bundled copy.
+        # Used by the audio tester only - the render chain is pure numpy (no ffmpeg anywhere).
+        ffplay = shutil.which("ffplay")
+        if not ffplay:
+            ffplay_env = self.environment.get("external_tools", {}).get("ffplay_path")
+            if ffplay_env:
+                candidate = Path(ffplay_env.strip('"'))
+                if not candidate.is_absolute():
+                    candidate = root_dir / candidate
+                if candidate.is_file():
+                    ffplay = str(candidate.resolve())
+        if not ffplay:
+            bundled = self.assets_dir / "bin" / "ffplay.exe"  # PyInstaller bundle (frozen)
+            if bundled.is_file():
+                ffplay = str(bundled)
+        self.ffplay_path = Path(ffplay) if ffplay else None  # None = tools not set up yet
 
         # --- ML MODEL INITIALIZATIONS (tracked defaults + untracked user overrides) ---
         models = {**self.environment.get("models", {}), **self.user_customization.get("models", {})}

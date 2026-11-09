@@ -4,6 +4,13 @@ import sys
 import socket
 import faulthandler
 
+# Windowed bare-launch (no console, no redirection): stdout/stderr are None.
+# Detach any print from the missing stream BEFORE anything else touches them.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")  # prints must never kill the boot
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 faulthandler.enable()
 
 # ============ IMMEDIATE SINGLE-INSTANCE GUARD ============
@@ -16,11 +23,11 @@ except socket.error:
 
 import threading
 import time
-from pathlib import Path
 from PIL import Image
 import pystray
 
 import engine.pipeline_status as pipeline_status
+from engine.path_utils import assets_root, project_root
 
 # 1ms system timer resolution: the oplock watcher's kernel waits and the watch
 # loop's sleeps otherwise quantize to ~15.6ms, tripling break-ack latency.
@@ -54,13 +61,11 @@ class _LineStamper:
         return False
 
 
-if sys.stdout is not None:
-    sys.stdout = _LineStamper(sys.stdout)
-if sys.stderr is not None:
-    sys.stderr = _LineStamper(sys.stderr)
+sys.stdout = _LineStamper(sys.stdout)
+sys.stderr = _LineStamper(sys.stderr)
 
 
-ROOT = Path(__file__).parent.parent
+ROOT = project_root()  # write-able anchor (exe dir when frozen); manager relaunches the exe itself
 MANAGED = "--managed" in sys.argv
 
 pipeline_status.clear_stop(ROOT)
@@ -114,7 +119,7 @@ class ManagedPipeline:
     state to the status file, and exits gracefully on a manager stop request."""
 
     def __init__(self):
-        self.ready_icon_path = ROOT / "assets" / "nms_dsv.png"
+        self.ready_icon_path = assets_root() / "assets" / "nms_dsv.png"
         self.icon = _ManagedIconHandle(self)
         self._stopped = False
         self._shutdown = False
@@ -158,7 +163,7 @@ class FastBootTray:
         self.running = True
 
         # Single image source target
-        self.ready_icon_path = ROOT / "assets" / "nms_dsv.png"
+        self.ready_icon_path = assets_root() / "assets" / "nms_dsv.png"
 
         try:
             if self.ready_icon_path.exists():

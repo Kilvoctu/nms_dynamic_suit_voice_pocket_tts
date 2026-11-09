@@ -17,16 +17,28 @@
 
 ### Requirements
 - Windows 10/11
-- Python 3.11, 3.12, or 3.13 (64-bit)
 - Internet access for the one-time downloads (~4.5 GB total)
 
 ### Installation
-1. Double-click **`run_manager.cmd`**. First run installs the dependencies into a virtual environment within the folder.
+1. Download the latest **`NMS_DSV-<version>-win64.zip`** from [Releases](../../releases), unzip it anywhere, and run **`DSV.exe`** in the `NMS_DSV` folder (no install; keep the `DSV.exe` + `DSV_runtime` folder together). Everything the app writes goes into its own `state\` folder beside the exe.
 2. In **System Environment**, enter your No Man's Sky MODS directory (Setup offers to create it):
    - Steam (example): `C:/Program Files (x86)/Steam/steamapps/common/No Man's Sky/GAMEDATA/MODS/`
    - MS Store (example): `D:/XboxGames/No Man's Sky/Content/GAMEDATA/MODS/`
-3. Press **Setup**. It finishes installing remaining dependencies and copies the mod files to your mods directory.
+3. Press **Setup**. It fetches the voice model into `state\` and copies the mod files to your mods directory.
 4. When it reports **Setup Complete**, close and restart the app, and all tabs unlock.
+
+**Run from source instead?** You need Python 3.11-3.13 (64-bit). In the repo root:
+
+   ```bat
+   python -m venv venv
+   venv\Scripts\activate
+   pip install -r requirements.txt
+   python main.py
+   ```
+
+   Then proceed with steps 2-4 above (MODS directory, **Setup**, restart).
+   Once Setup is complete, you can optionally build your own exe: run `build_exe.bat` (it needs the tools Setup already 
+   put in `state\bin\`, and produces the same `DSV.exe` + `DSV_runtime` layout as the release zip in the `dist\NMS_DSV` folder).
 
 ## Usage
 The manager starts the voice engine automatically and shows live status in the bottom bar. Once it says **Ready**, you can
@@ -64,7 +76,8 @@ Hover over anything in the manager for a tooltip, or just ask in [discussions](h
 This is a personal fork so I was not too concerned about documentation.
 
 ### Uninstall
-Remove the project directory and the `DYNAMIC_SUIT_VOICE` folder from the game's MODS directory. Nothing is installed anywhere else.
+Delete the app folder and the `DYNAMIC_SUIT_VOICE` folder from the game's MODS directory; `state\` keeps your settings; 
+back it up or delete it too. Nothing is installed anywhere else. Source installs: remove the project directory the same way.
 
 
 ## Credits & license

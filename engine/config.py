@@ -299,7 +299,7 @@ class SuitVoiceConfig:
         pipeline at init and lazily by the manager's combination test)."""
         self.llm = Llama(
             model_path=self.llm_model,
-            n_ctx=40960,
+            n_ctx=4096,
             n_batch=1024,
             n_threads=self.decode_threads,  # decode cap; also torch cap via pipeline; eval cap set below
             n_threads_batch=self.eval_threads,  # rephrase prompt-eval fans wide

@@ -291,9 +291,8 @@ class SystemTab(QWidget):
         self.purge_btn.clicked.connect(self._purge_audio_cache)
         self.purge_btn.setToolTip(
             "Emergency cleanup: deletes all cached voice variants and temp renders, plus the\n"
-            "Gemma 4 GGUF of the rephrasing model that is NOT selected (re-downloadable via\n"
-            "Setup). The active model and Pocket TTS weights stay untouched. Rarely needed -\n"
-            "the mod manages this cache automatically and re-fills it as you play."
+            "Gemma 4 GGUF of the model that is NOT selected (re-downloadable via Setup).\n"
+            "The active model and Pocket TTS weights stay untouched. The cache re-fills as you play."
         )
         maint_layout.addWidget(self.purge_btn)
 
@@ -360,10 +359,10 @@ class SystemTab(QWidget):
         self.eval_spin.setRange(1, max(cpu_count, 16))
         self.eval_spin.setValue(eval_val)
         self.eval_spin.setToolTip(
-            "Threads used while the AI reads the prompt and prepares each rephrasing (short bursts).\n"
-            "Default is about half your core count - smooth for gaming; raise to your full core\n"
-            "count for maximum pre-generation speed. In-between values (e.g. 12 on a 16-thread CPU)\n"
-            "are dramatically slower. Only applies on engine restart (bound when the model loads)."
+            "Threads while the AI reads the prompt before each rephrase.\n"
+            "Auto default: one thread per physical core (capped at 8) - smooth for gaming;\n"
+            "in-between values (e.g. 12 on a 16-thread CPU) are dramatically slower.\n"
+            "Engine restart to apply."
         )
         eval_row = QHBoxLayout()
         eval_label = QLabel("Evaluation Threads:")
@@ -379,8 +378,8 @@ class SystemTab(QWidget):
         self.decode_spin.setValue(decode_val)
         self.decode_spin.setToolTip(
             "Threads while the AI writes each new phrasing and the voice renders it.\n"
-            "Up to ~8 helps; beyond that it gets slower again.\n"
-            "Applies live for rendering; on engine restart for the LLM."
+            "Auto default: one thread per physical core (capped at 8) - up to ~8 helps,\n"
+            "beyond that it gets slower again. Rendering applies live; the LLM needs an engine restart."
         )
         decode_row = QHBoxLayout()
         decode_label = QLabel("Decoding Threads:")
@@ -403,10 +402,9 @@ class SystemTab(QWidget):
         self.model_combo.setFixedWidth(230)
         self.model_combo.setToolTip(
             "Which Gemma 4 GGUF rephrases the suit's lines.\n"
-            "E2B: fast baseline, ~1 s per line, 2.9 GB. E4B: wider phrasing variety, stronger\n"
-            "persona flavor, ~3 s per line, 4.6 GB.\n"
-            "Switching on Apply Changes restarts the engine (a few seconds to reload).\n"
-            "A missing selection falls back to E2B until Setup fetches it."
+            "E2B: fast baseline, 2.9 GB. E4B: wider phrasing variety, stronger persona\n"
+            "flavor, roughly 3x slower, 4.6 GB.\n"
+            "Switching on Apply Changes restarts the engine; a missing selection falls back to E2B until Setup fetches it."
         )
         model_row = QHBoxLayout()
         model_label = QLabel("Rephrasing model:")

@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 import numpy as np
-from scipy import signal
 
 # Parametric EQ / distance DSP primitives.
 
@@ -112,6 +111,8 @@ def apply_biquad(x: np.ndarray, b: np.ndarray, a: np.ndarray) -> np.ndarray:
     data = np.asarray(x, dtype=np.float32)
     if data.size == 0:
         return data
+    from scipy import signal
+
     return np.asarray(signal.lfilter(b, a, data, axis=0), dtype=np.float32)
 
 
@@ -155,6 +156,8 @@ def parametric_eq(stereo: np.ndarray, sr: int, bands: list[dict]) -> np.ndarray:
         except ValueError as e:
             print(f"skipping EQ band {band!r}: {e}")
             continue
+
+        from scipy import signal
 
         for i in range(processed.shape[1]):
             processed[:, i] = signal.lfilter(b, a, processed[:, i])
@@ -349,6 +352,8 @@ def _crusher(x: np.ndarray, bits: float, mix: float) -> np.ndarray:
 
 def _sosfilt(data: np.ndarray, sos: np.ndarray) -> np.ndarray:
     """Apply a second-order-sections filter along the time (axis 0 for stereo)."""
+    from scipy import signal
+
     if data.ndim == 2:
         return cast(np.ndarray, signal.sosfilt(sos, data, axis=0))
     return cast(np.ndarray, signal.sosfilt(sos, data))
@@ -383,6 +388,8 @@ def _decimate(x: np.ndarray, sr: int, rate_hz: float, mix: float) -> np.ndarray:
     n = data.shape[0]
 
     try:
+        from scipy import signal
+
         # Cutoff stays below both Nyquists: rate < sr and rate <= sr / step.
         cutoff = 0.45 * rate
         sos = cast(Any, signal.butter(_DECIMATE_FILTER_ORDER, cutoff, btype="lowpass", fs=sr_f, output="sos"))
@@ -455,6 +462,8 @@ def _radio_layer(x: np.ndarray, sr: int, hp_hz: float, lp_hz: float, level: floa
     lp = _clip(lp, 1.0, nyq)
 
     try:
+        from scipy import signal
+
         hp_sos = signal.butter(4, hp, btype="highpass", fs=sr_f, output="sos")
         lp_sos = signal.butter(4, lp, btype="lowpass", fs=sr_f, output="sos")
         chain = _sosfilt(arr, hp_sos)  # type: ignore[assignment]

@@ -16,6 +16,7 @@ faulthandler.enable()
 # ============ IMMEDIATE SINGLE-INSTANCE GUARD ============
 try:
     _instance_lock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    _instance_lock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
     _instance_lock.bind(("127.0.0.1", 49152))
     _instance_lock.listen(1)  # bind alone doesn't hold the port on Windows
 except socket.error:

@@ -64,13 +64,15 @@ def is_pipeline_running() -> bool:
     """True when the pipeline's single-instance guard socket (see engine/launcher.py)
     is bound - i.e. a pipeline instance is already running."""
     import socket
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind(("127.0.0.1", PIPELINE_SINGLE_INSTANCE_PORT))
-        probe.close()
         return False
     except OSError:
         return True
+    finally:
+        probe.close()
 
 
 def purge_cache_audio(project_root, env_data: dict) -> int:

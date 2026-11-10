@@ -5,7 +5,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from llama_cpp import Llama
+
 from engine import tts_utils
 from engine import prompt_presets
 from engine.prompt_utils import build_promptdata
@@ -297,6 +297,8 @@ class SuitVoiceConfig:
     def load_llm(self):
         """Construct the llama.cpp engine from the configured model (used by the
         pipeline at init and lazily by the manager's combination test)."""
+        from llama_cpp import Llama
+
         self.llm = Llama(
             model_path=self.llm_model,
             n_ctx=4096,

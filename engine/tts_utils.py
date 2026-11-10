@@ -1,4 +1,5 @@
 # engine/tts_utils.py
+import logging
 import os
 import shutil
 import subprocess
@@ -101,6 +102,60 @@ def _set_hub_offline(offline: bool) -> None:
     flag = "1" if offline else "0"
     os.environ["HF_HUB_OFFLINE"] = flag
     os.environ["TRANSFORMERS_OFFLINE"] = flag
+
+
+class _CloneLogHandler(logging.Handler):
+    """Routes pocket_tts progress logs to a callback (the clone UI's signal)."""
+
+    def __init__(self, cb):
+        super().__init__()
+        self._cb = cb
+
+    def emit(self, record):
+        try:
+            self._cb(record.getMessage())
+        except Exception:
+            pass
+
+
+def clone_pocket_voice(sample_path, dest_path, model_name, project_root, log_cb=None):
+    """Build a cloned-voice state from any pocket-tts-readable audio (wav, mp3,
+    flac, ogg) - mirrors the pocket-tts export-voice CLI, in-process. Offline
+    first (the cloning model usually sits in the shared HF cache); one online
+    fallback fetch only when the cache misses."""
+    _ensure_pocket_cache_env(project_root)
+    token_file = Path.home() / ".cache" / "huggingface" / "token"
+    if not os.environ.get("HF_TOKEN") and token_file.is_file():
+        os.environ["HF_TOKEN"] = token_file.read_text(encoding="utf-8").strip()
+
+    from pocket_tts import TTSModel
+    from pocket_tts.models.model_state import export_model_state
+
+    def _export() -> None:
+        model = TTSModel.load_model(language=model_name)
+        state = model.get_state_for_audio_prompt(audio_conditioning=str(sample_path), truncate=True)
+        export_model_state(state, str(dest_path))
+
+    logger = logging.getLogger("pocket_tts")
+    handler = _CloneLogHandler(log_cb) if log_cb else None
+    old_level = logger.level
+    if handler is not None:
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+    try:
+        _set_hub_offline(True)  # cache-only first: offline clones are the norm
+        try:
+            _export()
+        except Exception:
+            _set_hub_offline(False)  # cloning model not cached - one online fetch
+            if log_cb:
+                log_cb("Cloning model not found in the local cache - fetching it once...")
+            _export()
+    finally:
+        _set_hub_offline(True)
+        if handler is not None:
+            logger.removeHandler(handler)
+            logger.setLevel(old_level)
 
 
 def _offline_fallback_notice():

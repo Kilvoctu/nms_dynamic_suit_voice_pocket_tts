@@ -217,7 +217,8 @@ class SystemTab(QWidget):
         sample_row = QHBoxLayout()
         self.clone_sample_btn = QPushButton("Choose Sample...")
         self.clone_sample_btn.setToolTip(
-            "A clean single-speaker wav, 10-30 seconds, no music or background noise."
+            "A clean single-speaker recording (wav, mp3, flac or ogg),\n"
+            "10-30 seconds, no music or background noise."
         )
         self.clone_sample_btn.clicked.connect(self._choose_clone_sample)
         sample_row.addWidget(self.clone_sample_btn)
@@ -611,7 +612,8 @@ class SystemTab(QWidget):
 
     def _choose_clone_sample(self):
         start = self.window.last_browse_dir("clone_sample")
-        path, _ = QFileDialog.getOpenFileName(self, "Choose a Voice Sample", start, "WAV Audio (*.wav)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose a Voice Sample", start, "Audio (*.wav *.mp3 *.flac *.ogg)")
         if path:
             self.window.remember_browse_dir("clone_sample", path)
             self._clone_sample_path = Path(path)
@@ -648,47 +650,21 @@ class SystemTab(QWidget):
         if dest.exists():
             QMessageBox.critical(self, "Clone Error", f"A clone named '{name}' already exists for model {model}.")
             return
-        exe = Path(sys.executable).parent / "pocket-tts.exe"
-        if not exe.is_file():
-            QMessageBox.critical(self, "Clone Error", f"pocket-tts.exe not found next to {sys.executable}.")
-            return
         dest.parent.mkdir(parents=True, exist_ok=True)
         self._clone_auth_hint = False
         self._clone_log_tail = []
         self.clone_btn.setEnabled(False)
         self.clone_status.setText("Clone Queue: Preparing clone...")
-        cmd = [str(exe), "export-voice", str(sample), str(dest), "--language", model]
-        self._clone_thread = FunctionThread(lambda: self._clone_job(cmd, dest), self)
+        project_root = self.window.project_root
+        self._clone_thread = FunctionThread(
+            lambda: tts_utils.clone_pocket_voice(
+                sample, dest, model, project_root,
+                log_cb=lambda msg: self._thread.emit_log(msg)),
+            self)
         self._clone_thread.log_line.connect(self._on_clone_log)
         self._clone_thread.finished_ok.connect(lambda _r: self._clone_finished(None, name))
         self._clone_thread.failed.connect(lambda err: self._clone_finished(err, name))
         self._clone_thread.start()
-
-    def _clone_job(self, cmd, dest):
-        create_no_window = 0x08000000 if sys.platform == "win32" else 0
-        # Scrub the runtime-offline flags: cloning needs the full gated model,
-        # which may not be in the redirected HF cache yet (one-time download).
-        env = dict(os.environ)
-        for flag in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
-            env.pop(flag, None)
-        tts_utils._ensure_pocket_cache_env(self.window.project_root)
-        env.setdefault("HF_HOME", str(self.window.project_root / "state" / "cache"))
-        hub_dir = self.window.project_root / "state" / "cache" / "hub"
-        env.setdefault("HF_HUB_CACHE", str(hub_dir))
-        env.setdefault("HUGGINGFACE_HUB_CACHE", str(hub_dir))
-        if not env.get("HF_TOKEN"):
-            token_file = Path.home() / ".cache" / "huggingface" / "token"
-            if token_file.is_file():
-                env["HF_TOKEN"] = token_file.read_text(encoding="utf-8").strip()
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            encoding="utf-8", errors="replace", creationflags=create_no_window, env=env,
-        )
-        for line in proc.stdout:
-            self._clone_thread.emit_log(line.rstrip())
-        proc.wait()
-        if proc.returncode != 0 or not dest.is_file():
-            raise RuntimeError(f"export-voice exited with code {proc.returncode}")
 
     def _on_clone_log(self, line):
         """GUI-side clone log: classify the phase for the status label and keep

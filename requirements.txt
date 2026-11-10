@@ -5,6 +5,7 @@
 pocket-tts>=4.0.1
 numpy
 scipy
+soundfile>=0.12
 pyloudnorm==0.2.0
 praat-parselmouth==0.4.7
 llama-cpp-python==0.3.36

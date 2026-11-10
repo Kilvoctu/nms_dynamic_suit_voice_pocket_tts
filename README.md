@@ -58,7 +58,7 @@ This tab contains all the options for customizing voice; it includes settings fo
 an effects rack, buttons for testing. You can use the built-in presets or make and manage your own.
 
 ### Voice Cloning
-Located in the **System Environment** tab. It uses a different Pocket TTS model, and you have to accept the Kyutai's 
+Located in the **System Environment** tab. It uses a different Pocket TTS model, and you have to accept Kyutai's 
 (the developer) terms before cloning. Press **Sign in & Preload Model** to open a Hugging Face sign-in window. When you 
 accept, it'll give an access token to paste in then it'll download the cloning model. The rest should be pretty 
 self-explanatory. Just ensure to use a clean sample: one speaker, no music or background noise, 10-30 seconds, as a `.wav` file.

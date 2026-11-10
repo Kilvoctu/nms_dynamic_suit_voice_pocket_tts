@@ -75,8 +75,9 @@ def _acquire_instance_lock():
 
 
 def _main() -> None:
+    from PySide6.QtCore import Qt
     from PySide6.QtGui import QIcon
-    from PySide6.QtWidgets import QApplication, QMessageBox
+    from PySide6.QtWidgets import QApplication, QMessageBox, QSplashScreen
 
     from ui.main_window import MainWindow
     from ui.style import APP_QSS
@@ -116,8 +117,14 @@ def _main() -> None:
     app.setStyleSheet(APP_QSS)  # group-box bevels + slim scrollbars, app-wide
     _boot_log("QApplication created")
 
+    splash = QSplashScreen(QIcon(str(assets_root() / "assets" / "nms_dsv.png")).pixmap(256, 256))
+    splash.showMessage("Loading Dynamic Suit Voice...", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
+    splash.show()
+    app.processEvents()
+
     lock = _acquire_instance_lock()
     if lock is None:
+        splash.close()
         QMessageBox.warning(None, "NMS DSV Manager", "The Management Utility is already running.")
         sys.exit(0)
     _boot_log("instance lock acquired")
@@ -125,6 +132,7 @@ def _main() -> None:
     window = MainWindow()
     _boot_log("MainWindow constructed")
     window.show()
+    splash.finish(window)
     _boot_log("window shown; entering event loop")
     sys.exit(app.exec())
 

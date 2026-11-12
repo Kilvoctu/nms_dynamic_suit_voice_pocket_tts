@@ -1,4 +1,3 @@
-import random
 import re
 
 
@@ -81,17 +80,15 @@ def construct_standard_prompt(config, category, intent, phrase, wem_id):
                       'Never use any name or title; address the player only as "you" or "your".',
                       base)
     system_prompt = base + "\n\n"
-    tone = determine_tone(config)
-    wordiness_level = determine_wordiness(config)
     category_context = config.promptdata.get(category, config.promptdata.get("Default", ""))
-    wordiness_entry = config.promptdata.get("wordiness", {}).get(wordiness_level) or {}
+    wordiness_entry = config.promptdata.get("wordiness", {}).get(config.current_wordiness) or {}
     if isinstance(wordiness_entry, str):  # legacy flattened entry
         wordiness_entry = {"prompt": wordiness_entry}
     wordiness_prompt = wordiness_entry.get("prompt", "")
     length_reminder = length_phrase(
         wordiness_entry.get("min_sentences"), wordiness_entry.get("max_sentences")
     )
-    tone_prompt = config.promptdata.get("tones", {}).get(tone, "")
+    tone_prompt = config.promptdata.get("tones", {}).get(config.current_tone, "")
     recent_lines = retrieve_recent_lines(config, wem_id)
 
     # Assemble dynamic prompt
@@ -133,41 +130,6 @@ def _fill_name(text: str, config) -> str:
     if title == "the player":
         text = re.sub(r"(?m)(^|[.!?]\s+)\{name\}", lambda m: m.group(1) + "The player", text)
     return text.replace("{name}", title)
-
-
-def determine_tone(config):
-    tones = list(config.promptdata.get("tones", {}).keys())
-    current_tone = config.current_tone
-
-    # Test harnesses lock the selection to preview the exact chosen combination
-    if getattr(config, "selection_locked", False):
-        return current_tone
-
-    # 90% chance stick with default
-    if random.random() < 0.9 or not tones:
-        return current_tone
-
-    # 10% chance pick another from the configured tones
-    return random.choice([t for t in tones if t != current_tone])
-
-
-def determine_wordiness(config):
-    current = config.current_wordiness
-
-    # Test harnesses lock the selection to preview the exact chosen combination
-    if getattr(config, "selection_locked", False):
-        return current
-
-    # If observer is explicitly set, never override it
-    if current == "Observer":
-        return current
-
-    # 95% chance stick with whatever's configured
-    if random.random() < 0.95:
-        return current
-
-    # 5% chance: override with verbose
-    return "Verbose"
 
 def retrieve_recent_lines(config, wem_number):
     """Return recent lines for this WEM ID as a single string, ready for prompt insertion."""

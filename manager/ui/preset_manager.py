@@ -517,7 +517,6 @@ class CombinationTestTab(QWidget):
             from engine.config import SuitVoiceConfig
 
             self._config = SuitVoiceConfig(init_llm=False)
-            self._config.selection_locked = True
         else:
             # prompt assets live-reload, so template/preset edits reach the
             # tester without reopening the dialog; reload resets tone/wordiness
